@@ -19,11 +19,11 @@ fi
 # den Wert hier trotzdem ausdruecklich und legen zusaetzlich /etc/localtime an,
 # damit Python und APScheduler in jedem Fall dieselbe Zeitzone verwenden wie
 # Home Assistant. Ohne das liefen Zeitplaene in UTC.
-if bashio::var.is_empty "${TZ:-}"; then
+if [ -z "${TZ:-}" ]; then
     TZ="$(bashio::info.timezone 2>/dev/null || true)"
 fi
 
-if bashio::var.has_value "${TZ:-}" && [ -f "/usr/share/zoneinfo/${TZ}" ]; then
+if [ -n "${TZ:-}" ] && [ -f "/usr/share/zoneinfo/${TZ}" ]; then
     cp "/usr/share/zoneinfo/${TZ}" /etc/localtime
     echo "${TZ}" > /etc/timezone
     export TZ
