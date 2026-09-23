@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Recorder</title>
+<style>
+:root{
+  --bg:#111827; --card:#1f2937; --sunk:#0f172a; --line:#374151;
+  --text:#f3f4f6; --muted:#9ca3af; --accent:#2563eb; --danger:#b91c1c;
+  --ok:#15803d; --warn:#b45309;
+}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);color:var(--text);margin:0;padding:20px;line-height:1.5}
+.wrap{max-width:980px;margin:auto}
+.card{background:var(--card);border-radius:14px;padding:18px;margin-bottom:16px;
+  box-shadow:0 4px 16px #0004}
+h1,h2,h3{margin-top:0}
+h1{font-size:1.6rem}
+h2{font-size:1.15rem}
+input,select,button{font:inherit;border-radius:9px;border:1px solid #4b5563;
+  padding:10px;background:var(--bg);color:#fff;width:100%}
+button{cursor:pointer;background:var(--accent);border:0;width:auto}
+button:hover{filter:brightness(1.12)}
+button.danger{background:var(--danger)}
+button.ghost{background:transparent;border:1px solid #4b5563}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.small{font-size:.87rem;color:var(--muted)}
+.status{padding:12px 14px;background:var(--sunk);border-radius:10px;margin:10px 0;
+  border-left:4px solid var(--accent)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:9px;border-bottom:1px solid var(--line);
+  vertical-align:top}
+th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+label{display:block;margin-bottom:5px;font-size:.9rem;color:var(--muted)}
+.weekdays label{display:inline-flex;align-items:center;gap:5px;margin-right:12px;
+  color:var(--text);font-size:1rem}
+.weekdays input{width:auto}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;
+  white-space:nowrap}
+.badge.completed{background:var(--ok)}
+.badge.failed{background:var(--danger)}
+.badge.cancelled{background:var(--warn)}
+.flash{padding:11px 14px;border-radius:10px;margin-bottom:12px}
+.flash.error{background:#7f1d1d}
+.flash.ok{background:#14532d}
+.err{color:#fca5a5;font-size:.85rem;word-break:break-word}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.83rem;
+  color:var(--muted);word-break:break-all}
+footer{color:var(--muted);font-size:.82rem;text-align:center;padding:10px 0 30px}
+@media(max-width:560px){ body{padding:12px} .hide-s{display:none} }
+</style>
+</head>
+<body><div class="wrap">
+
+<h1>📻 Radio Recorder</h1>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="flash {{ category }}">{{ message }}</div>
+  {% endfor %}
+{% endwith %}
+
+<div class="card">
+  <h2>Manuelle Aufnahme</h2>
+  <form method="post" action="{{ base }}start">
+    <div class="grid">
+      <div>
+        <label for="m-station">Sender</label>
+        <select id="m-station" name="station">
+          {% for key, name in stations %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="m-label">Bezeichnung <span class="small">(optional)</span></label>
+        <input id="m-label" name="label" placeholder="z. B. Clubnacht">
+      </div>
+      <div>
+        <label for="m-hours">Stunden</label>
+        <input id="m-hours" type="number" min="0" max="24" name="hours" value="{{ default_hours }}">
+      </div>
+      <div>
+        <label for="m-minutes">Minuten</label>
+        <input id="m-minutes" type="number" min="0" max="59" name="minutes" value="{{ default_minutes }}">
+      </div>
+    </div>
+    <p><button type="submit">⏺ Aufnahme starten</button></p>
+  </form>
+
+  <h3>Laufende Aufnahmen</h3>
+  <div id="laufende">
+    {% if active %}
+      {% for rec in active %}
+      <div class="status" data-id="{{ rec.id }}">
+        <div class="row">
+          <b>{{ rec.station_name }}</b>
+          {% if rec.label %}<span class="small">{{ rec.label }}</span>{% endif %}
+        </div>
+        <div class="small">
+          läuft seit <span data-feld="elapsed">{{ rec.elapsed }}</span> ·
+          noch <span data-feld="remaining">{{ rec.remaining }}</span> ·
+          <span data-feld="size">{{ rec.size_bytes | groesse }}</span>
+          <span data-feld="hinweis">
+          {%- if rec.resume_count %} · nach Neustart fortgesetzt ({{ rec.resume_count }}×){% endif -%}
+          {%- if rec.retry_count %} · {{ rec.retry_count }} Wiederverbindung(en){% endif -%}
+          </span>
+        </div>
+        <div class="small">Ende geplant: {{ rec.planned_end.strftime('%H:%M:%S') }}</div>
+        <form method="post" action="{{ base }}stop/{{ rec.id }}" style="margin-top:9px">
+          <button class="danger">⏹ Stoppen</button>
+        </form>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="small">Zurzeit läuft keine Aufnahme.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Zeitplan hinzufügen</h2>
+  <form method="post" action="{{ base }}schedule/add">
+    <div class="grid">
+      <div>
+        <label for="s-name">Name</label>
+        <input id="s-name" name="name" placeholder="z. B. Freitag Nacht" required>
+      </div>
+      <div>
+        <label for="s-station">Sender</label>
+        <select id="s-station" name="station">
+          {% for key, name in stations %}<option value="{{ key }}">{{ name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="s-time">Startzeit</label>
+        <input id="s-time" type="time" name="start_time" required>
+      </div>
+      <div>
+        <label for="s-hours">Stunden</label>
+        <input id="s-hours" type="number" min="0" max="24" name="hours" value="{{ default_hours }}" required>
+      </div>
+      <div>
+        <label for="s-minutes">Minuten</label>
+        <input id="s-minutes" type="number" min="0" max="59" name="minutes" value="{{ default_minutes }}" required>
+      </div>
+    </div>
+    <p class="weekdays">
+      {% for key, label in weekdays %}
+      <label><input type="checkbox" name="weekday" value="{{ key }}">{{ label }}</label>
+      {% endfor %}
+    </p>
+    <button type="submit">➕ Zeitplan speichern</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Gespeicherte Zeitpläne</h2>
+  {% if jobs %}
+  <table>
+    <tr>
+      <th>Name</th><th>Start</th><th class="hide-s">Tage</th><th>Dauer</th>
+      <th class="hide-s">Nächste</th><th></th>
+    </tr>
+    {% for job in jobs %}
+    <tr {% if not job.enabled %}style="opacity:.5"{% endif %}>
+      <td>
+        {{ job.name }}<br>
+        <span class="small">{{ station_labels.get(job.station, job.station) }}</span>
+      </td>
+      <td>{{ job.start_time }}</td>
+      <td class="hide-s">{{ job.weekday_text }}</td>
+      <td>{{ job.duration_text }}</td>
+      <td class="hide-s small">{% if job.enabled %}{{ job.next_run }}{% else %}pausiert{% endif %}</td>
+      <td>
+        <div class="row">
+          <form method="post" action="{{ base }}schedule/toggle/{{ job.id }}">
+            <button class="ghost">{% if job.enabled %}⏸{% else %}▶{% endif %}</button>
+          </form>
+          <form method="post" action="{{ base }}schedule/delete/{{ job.id }}">
+            <button class="danger">🗑</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">Noch keine Zeitpläne gespeichert.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Letzte Aufnahmen</h2>
+  {% if history %}
+  <table>
+    <tr>
+      <th>Status</th><th>Sender</th><th>Beginn</th>
+      <th class="hide-s">Dauer</th><th>Größe</th>
+    </tr>
+    {% for item in history %}
+    <tr>
+      <td><span class="badge {{ item.state }}">{{ item.state_label }}</span></td>
+      <td>
+        {{ item.station_name }}
+        {% if item.label %}<br><span class="small">{{ item.label }}</span>{% endif %}
+      </td>
+      <td class="small">{{ item.started_at | uhrzeit }}</td>
+      <td class="hide-s small">{{ item.duration_text }}</td>
+      <td class="small">{{ item.size_bytes | groesse }}</td>
+    </tr>
+    {% if item.error %}
+    <tr><td colspan="5" class="err">⚠ {{ item.error }}</td></tr>
+    {% elif item.output_file %}
+    <tr><td colspan="5" class="mono">{{ item.output_file }}</td></tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+  {% else %}<p class="small">Noch keine abgeschlossenen Aufnahmen.</p>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Speicher</h2>
+  <p><b>Zielordner:</b> <span class="mono">{{ output_dir }}</span></p>
+  <p class="small">
+    Aufnahmen bis 24 Stunden werden unterstützt. Angefangene Aufnahmen
+    überstehen einen Neustart des Add-ons und werden danach fortgesetzt.
+  </p>
+</div>
+
+<footer>Version {{ version }} · Zeitzone: {{ timezone }}</footer>
+
+</div>
+<script>
+// Aktualisiert die laufenden Aufnahmen, ohne die Seite neu zu laden.
+(function () {
+  var block = document.getElementById('laufende');
+  if (!block) return;
+
+  function ids() {
+    return Array.prototype.map
+      .call(block.querySelectorAll('[data-id]'), function (el) { return el.dataset.id; })
+      .sort().join(',');
+  }
+
+  function aktualisieren() {
+    fetch('{{ base }}api/status', { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (daten) {
+        if (!daten) return;
+        var neu = daten.active.map(function (a) { return a.id; }).sort().join(',');
+        if (neu !== ids()) { window.location.reload(); return; }
+        daten.active.forEach(function (a) {
+          var karte = block.querySelector('[data-id="' + a.id + '"]');
+          if (!karte) return;
+          var setze = function (feld, wert) {
+            var el = karte.querySelector('[data-feld="' + feld + '"]');
+            if (el) el.textContent = wert;
+          };
+          setze('elapsed', a.elapsed);
+          setze('remaining', a.remaining);
+          setze('size', a.size);
+        });
+      })
+      .catch(function () { /* Netzfehler ignorieren, naechster Versuch folgt */ });
+  }
+
+  setInterval(aktualisieren, 5000);
+})();
+</script>
+</body>
+</html>

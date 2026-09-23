@@ -1,5 +1,5 @@
 name: "Radio Recorder"
-version: "0.2.0"
+version: "0.3.0"
 slug: "radio_recorder"
 description: "Internetradio zeitgesteuert mit FFmpeg aufzeichnen"
 arch:
@@ -19,7 +19,9 @@ options:
   output_dir: "/media/Musick/Radioaufnahmen"
   default_duration_hours: 4
   default_duration_minutes: 0
+  segment_minutes: 10
 schema:
   output_dir: str
   default_duration_hours: int(0,24)
   default_duration_minutes: int(0,59)
+  segment_minutes: int(1,60)
