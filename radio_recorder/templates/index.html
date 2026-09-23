@@ -220,10 +220,34 @@ footer{color:var(--muted);font-size:.82rem;text-align:center;padding:10px 0 30px
 
 <div class="card">
   <h2>Speicher</h2>
-  <p><b>Zielordner:</b> <span class="mono">{{ output_dir }}</span></p>
+  <table>
+    <tr>
+      <th>Zielordner</th>
+      <td><span class="mono">{{ speicher.output_dir }}</span><br>
+          <span class="small">{{ speicher.frei_ziel }} frei</span></td>
+    </tr>
+    <tr>
+      <th>Arbeitsordner</th>
+      <td><span class="mono">{{ speicher.work_dir }}</span><br>
+          <span class="small">
+            {{ speicher.frei_arbeit }} frei{% if speicher.gemeinsam %} ·
+            gleicher Datenträger wie der Zielordner{% endif %}
+          </span></td>
+    </tr>
+  </table>
+  <p class="{% if speicher.knapp %}err{% else %}small{% endif %}">
+    {% if speicher.knapp %}⚠ {% endif %}
+    Reicht für etwa <b>{{ speicher.reichweite }} Stunden</b> Aufnahme
+    bei {{ speicher.bitrate }} kbit/s
+    ({{ speicher.reserve }} bleiben als Reserve frei).
+  </p>
   <p class="small">
-    Aufnahmen bis 24 Stunden werden unterstützt. Angefangene Aufnahmen
-    überstehen einen Neustart des Add-ons und werden danach fortgesetzt.
+    Während der Aufnahme entstehen Zwischenstücke im Arbeitsordner; erst am
+    Ende werden sie in den Zielordner zusammengefügt.
+    {%- if speicher.gemeinsam %} Da beide auf demselben Datenträger liegen,
+    wird dabei kurzzeitig der doppelte Platz belegt.{% endif %}
+    Geht der Platz während einer langen Aufnahme zur Neige, wird geordnet
+    gestoppt und das bis dahin Aufgenommene gespeichert.
   </p>
 </div>
 

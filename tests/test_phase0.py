@@ -268,6 +268,55 @@ pruefe(antwort.status_code in (302, 303), "Unbekannter Sender fuehrt nicht zum A
        f"-> {antwort.status_code}")
 
 
+print("\n=== 8. Lange Aufnahmen und Speicherplatz ===")
+from radio_recorder import recorder as recorder_mod            # noqa: E402
+
+station = config.get_station("sunshine_live")
+pruefe(recorder_mod.estimate_bytes(station, 60) == 86_400_000,
+       "Platzbedarf fuer eine Stunde bei 192 kbit/s",
+       f"-> {recorder_mod.estimate_bytes(station, 60)}")
+pruefe(recorder_mod.estimate_bytes(station, 12 * 60) == 1_036_800_000,
+       "Platzbedarf fuer zwoelf Stunden",
+       f"-> {recorder_mod.estimate_bytes(station, 12*60)}")
+pruefe(recorder_mod.free_bytes(config.WORK_DIR) is not None,
+       "Freier Platz ist ermittelbar")
+
+rec7 = Recorder()
+rid6 = rec7.start("sunshine_live", duration_minutes=10 * 60, label="Zehn Stunden")
+lang = db.get_recording(rid6)
+spanne = (datetime.fromisoformat(lang["planned_end"])
+          - datetime.fromisoformat(lang["started_at"]))
+pruefe(spanne == timedelta(hours=10), "Zehn-Stunden-Aufnahme wird angenommen",
+       f"-> {spanne}")
+rec7.stop(rid6)
+warte_auf_zustand(rid6)
+
+merk_frei = config.MIN_FREE_MB
+config.MIN_FREE_MB = 10 ** 9          # unerfuellbar viel verlangen
+try:
+    Recorder().start("sunshine_live", duration_minutes=60, label="Kein Platz")
+    pruefe(False, "Start bei zu wenig Platz wird abgelehnt")
+except ValueError as err:
+    pruefe("Speicherplatz" in str(err), "Start bei zu wenig Platz wird abgelehnt",
+           f"-> {err}")
+config.MIN_FREE_MB = merk_frei
+
+config.SPACE_CHECK_SECONDS = 2
+rec8 = Recorder()
+rid7 = rec8.start("sunshine_live", duration_minutes=60, label="Platz geht aus")
+time.sleep(1)
+config.MIN_FREE_MB = 10 ** 9          # Platz geht mitten in der Aufnahme aus
+knapp = warte_auf_zustand(rid7, timeout=30)
+config.MIN_FREE_MB = merk_frei
+pruefe(knapp["state"] == "cancelled",
+       "Aufnahme stoppt von selbst statt zu scheitern", f"-> {knapp['state']}")
+pruefe("frei" in (knapp["error"] or ""), "Grund wird vermerkt",
+       f"-> {knapp['error']!r}")
+pruefe(Path(knapp["output_file"] or "").exists() and knapp["size_bytes"] > 0,
+       "Das bis dahin Aufgenommene bleibt erhalten",
+       f"-> {knapp['size_bytes']} B")
+
+
 scheduler.shutdown()
 print("\n" + "=" * 62)
 print(f"Bestanden: {len(bestanden)}   Fehlgeschlagen: {len(fehlgeschlagen)}")

@@ -60,6 +60,7 @@ class _Active:
         self.proc = None
         self.stop_requested = False
         self.paused = False          # Herunterfahren: Zustand bleibt "running"
+        self.notice = None           # Grund, falls von selbst gestoppt wurde
         self.thread = None
         self.stderr_tail = deque(maxlen=40)
         self.lock = threading.Lock()
@@ -84,6 +85,8 @@ class Recorder:
                 f"Dauer muss zwischen 1 Minute und "
                 f"{config.MAX_DURATION_MINUTES // 60} Stunden liegen."
             )
+
+        check_disk_space(station, duration)
 
         started = datetime.now()
         planned_end = started + timedelta(minutes=duration)
@@ -281,7 +284,7 @@ class Recorder:
             else:
                 self._finalize(rid, db.get_recording(rid) or record,
                                cancelled=active.stop_requested,
-                               failure=failure)
+                               failure=failure or active.notice)
 
     def _run_ffmpeg(self, active, work_dir, ext, remaining_seconds):
         """Startet ffmpeg fuer einen Abschnitt und wartet auf das Ende."""
@@ -334,7 +337,9 @@ class Recorder:
 
         hard_stop = datetime.fromisoformat(record["planned_end"]) + timedelta(
             seconds=_END_GRACE_SECONDS)
+        naechste_platzpruefung = time.monotonic() + config.SPACE_CHECK_SECONDS
         signalled = False
+
         while proc.poll() is None:
             if not signalled and datetime.now() >= hard_stop:
                 # Stream stockt: ffmpegs -t zaehlt Stream-Zeit, nicht Uhrzeit.
@@ -343,6 +348,24 @@ class Recorder:
                 active.stop_requested = True
                 self._signal_process(active)
                 signalled = True
+
+            # Bei langen Aufnahmen kann der Platz waehrenddessen ausgehen.
+            # Dann lieber geordnet stoppen und das Aufgenommene behalten,
+            # als ffmpeg mitten im Schreiben scheitern zu lassen.
+            if not signalled and time.monotonic() >= naechste_platzpruefung:
+                naechste_platzpruefung = (time.monotonic()
+                                          + config.SPACE_CHECK_SECONDS)
+                frei = free_bytes(work_dir)
+                if frei is not None and frei < config.MIN_FREE_MB * 1024 * 1024:
+                    active.notice = (
+                        f"Aufnahme vorzeitig beendet: nur noch {_mb(frei)} "
+                        f"frei im Arbeitsordner. Das bis dahin Aufgenommene "
+                        f"wurde gespeichert.")
+                    print(f"[rec {active.id}] {active.notice}", flush=True)
+                    active.stop_requested = True
+                    self._signal_process(active)
+                    signalled = True
+
             time.sleep(0.5)
 
         reader.join(timeout=5)
@@ -412,6 +435,77 @@ class Recorder:
         _remove_dir(work_dir)
         print(f"[rec {rid}] Fertig: {target} ({size / 1024 / 1024:.1f} MB, "
               f"{len(segments)} Segment(e))", flush=True)
+
+
+# --- Speicherplatz -------------------------------------------------------
+
+def estimate_bytes(station, minutes):
+    """Grobe Groesse einer Aufnahme. Der Stream liefert konstante Bitrate."""
+    kbps = int(station.get("bitrate_kbps") or config.DEFAULT_BITRATE_KBPS)
+    return int(kbps * 1000 / 8 * int(minutes) * 60)
+
+
+def free_bytes(path):
+    """Freier Platz dort, wo ``path`` liegt bzw. angelegt wuerde."""
+    candidate = Path(path)
+    while not candidate.exists() and candidate != candidate.parent:
+        candidate = candidate.parent
+    try:
+        return shutil.disk_usage(str(candidate)).free
+    except OSError:
+        return None
+
+
+def same_volume(first, second):
+    """Liegen beide Pfade auf demselben Datentraeger?"""
+    def device(path):
+        candidate = Path(path)
+        while not candidate.exists() and candidate != candidate.parent:
+            candidate = candidate.parent
+        try:
+            return candidate.stat().st_dev
+        except OSError:
+            return None
+
+    left, right = device(first), device(second)
+    return left is not None and left == right
+
+
+def check_disk_space(station, minutes):
+    """Prueft vor dem Start, ob die Aufnahme ueberhaupt Platz hat.
+
+    Liegen Arbeits- und Zielordner auf demselben Datentraeger, wird kurz vor
+    dem Ende doppelt so viel gebraucht: die Segmente bestehen beim
+    Zusammenfuegen noch, waehrend die Zieldatei schon geschrieben wird.
+    """
+    needed = estimate_bytes(station, minutes)
+    reserve = config.MIN_FREE_MB * 1024 * 1024
+    gemeinsam = same_volume(config.WORK_DIR, config.OUTPUT_DIR)
+
+    ziele = [("Arbeitsordner", config.WORK_DIR,
+              needed * 2 if gemeinsam else needed)]
+    if not gemeinsam:
+        ziele.append(("Zielordner", config.OUTPUT_DIR, needed))
+
+    for bezeichnung, pfad, bedarf in ziele:
+        frei = free_bytes(pfad)
+        if frei is None:
+            continue
+        if frei < bedarf + reserve:
+            raise ValueError(
+                f"Zu wenig Speicherplatz im {bezeichnung} ({pfad}): "
+                f"gebraucht werden etwa {_mb(bedarf)}, frei sind {_mb(frei)} "
+                f"(davon sollen {_mb(reserve)} frei bleiben)."
+            )
+
+
+def _mb(value):
+    size = float(value or 0)
+    for unit in ("B", "KB", "MB"):
+        if size < 1024:
+            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} GB"
 
 
 # --- Hilfsfunktionen -----------------------------------------------------

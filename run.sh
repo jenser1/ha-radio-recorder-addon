@@ -5,6 +5,14 @@ export OUTPUT_DIR="$(bashio::config 'output_dir')"
 export DEFAULT_DURATION_HOURS="$(bashio::config 'default_duration_hours')"
 export DEFAULT_DURATION_MINUTES="$(bashio::config 'default_duration_minutes')"
 export SEGMENT_MINUTES="$(bashio::config 'segment_minutes')"
+export MIN_FREE_MB="$(bashio::config 'min_free_mb')"
+
+# Arbeitsordner ist optional. Ohne Angabe bleiben die Zwischenstuecke im
+# Add-on-Speicher unter /data/work.
+if bashio::config.has_value 'work_dir'; then
+    export WORK_DIR="$(bashio::config 'work_dir')"
+    mkdir -p "${WORK_DIR}" || bashio::log.warning "Arbeitsordner ${WORK_DIR} nicht anlegbar"
+fi
 
 # --- Zeitzone ---------------------------------------------------------------
 # Der Supervisor reicht TZ normalerweise selbst in den Container. Wir setzen

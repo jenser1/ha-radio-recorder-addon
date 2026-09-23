@@ -6,6 +6,7 @@ from datetime import datetime
 from flask import (Flask, flash, jsonify, redirect, render_template, request)
 
 from . import __version__, config, db, scheduler
+from . import recorder as recorder_mod
 from .recorder import recorder
 
 STATE_LABELS = {
@@ -64,6 +65,7 @@ def create_app():
             jobs=jobs,
             active=recorder.active(),
             history=history,
+            speicher=storage_info(),
             station_labels=dict(config.station_choices()),
         )
 
@@ -199,6 +201,39 @@ def _span(start, end):
     if not first or not second:
         return "-"
     return format_duration(int((second - first).total_seconds() // 60))
+
+
+def storage_info():
+    """Platzangaben fuer die Oberflaeche, inklusive grober Reichweite."""
+    reserve = config.MIN_FREE_MB * 1024 * 1024
+    gemeinsam = recorder_mod.same_volume(config.WORK_DIR, config.OUTPUT_DIR)
+    frei_arbeit = recorder_mod.free_bytes(config.WORK_DIR)
+    frei_ziel = recorder_mod.free_bytes(config.OUTPUT_DIR)
+
+    # Beim Zusammenfuegen bestehen Segmente und Zieldatei kurz gleichzeitig -
+    # auf einem gemeinsamen Datentraeger zaehlt also der doppelte Bedarf.
+    nutzbar = None
+    if frei_arbeit is not None:
+        nutzbar = max(0, frei_arbeit - reserve)
+        if gemeinsam:
+            nutzbar //= 2
+        elif frei_ziel is not None:
+            nutzbar = min(nutzbar, max(0, frei_ziel - reserve))
+
+    pro_stunde = config.DEFAULT_BITRATE_KBPS * 1000 / 8 * 3600
+    stunden = (nutzbar / pro_stunde) if nutzbar else 0
+
+    return {
+        "output_dir": str(config.OUTPUT_DIR),
+        "work_dir": str(config.WORK_DIR),
+        "gemeinsam": gemeinsam,
+        "frei_arbeit": format_size(frei_arbeit) if frei_arbeit is not None else "?",
+        "frei_ziel": format_size(frei_ziel) if frei_ziel is not None else "?",
+        "reserve": format_size(reserve),
+        "reichweite": f"{stunden:.0f}" if stunden >= 1 else "unter 1",
+        "bitrate": config.DEFAULT_BITRATE_KBPS,
+        "knapp": stunden < 2,
+    }
 
 
 def format_next_run(moment):

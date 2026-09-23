@@ -12,7 +12,7 @@ __all__ = [
     "TIMEZONE", "DEFAULT_DURATION_HOURS", "DEFAULT_DURATION_MINUTES",
     "SEGMENT_MINUTES", "MAX_DURATION_MINUTES", "PORT", "STATIONS",
     "MAX_STREAM_RETRIES", "RETRY_BACKOFF_SECONDS", "SHUTDOWN_TIMEOUT",
-    "FFMPEG",
+    "FFMPEG", "MIN_FREE_MB", "SPACE_CHECK_SECONDS", "DEFAULT_BITRATE_KBPS",
     "get_station", "station_choices",
 ]
 
@@ -44,7 +44,13 @@ OUTPUT_DIR = _path_env("OUTPUT_DIR", "/media/Musick/Radioaufnahmen")
 DATA_DIR = _path_env("DATA_DIR", "/data")
 
 # Arbeitsverzeichnis fuer angefangene Aufnahmen (Segmente).
-WORK_DIR = DATA_DIR / "work"
+#
+# Vorgabe ist der Add-on-Speicher. Der liegt lokal und uebersteht damit auch
+# einen Netzwerkausfall, waehrend eine Aufnahme laeuft. Wer wenig Platz auf
+# dem Systemdatentraeger hat, kann ihn ueber die Option "work_dir" auf eine
+# andere Ablage legen - dann aber ohne diesen Schutz.
+_work_override = (os.environ.get("WORK_DIR") or "").strip()
+WORK_DIR = Path(_work_override) if _work_override else DATA_DIR / "work"
 
 DB_FILE = DATA_DIR / "radio_recorder.db"
 
@@ -71,6 +77,13 @@ SEGMENT_MINUTES = _int_env("SEGMENT_MINUTES", 10, 1, 60)
 
 MAX_DURATION_MINUTES = 24 * 60
 
+# So viel Platz soll auf dem Datentraeger frei bleiben. Wird vor dem Start
+# geprueft und waehrend langer Aufnahmen ueberwacht.
+MIN_FREE_MB = _int_env("MIN_FREE_MB", 500, 0, 1024 * 1024)
+
+# Abstand zwischen zwei Platzpruefungen waehrend einer laufenden Aufnahme.
+SPACE_CHECK_SECONDS = 60
+
 # Bricht der Stream mitten in der Aufnahme weg, versucht es das Add-on so oft
 # erneut, solange die geplante Endzeit noch nicht erreicht ist.
 MAX_STREAM_RETRIES = 10
@@ -95,8 +108,12 @@ STATIONS = {
         "name": "SUNSHINE LIVE",
         "url": "https://stream.sunshine-live.de/live/mp3-192/stream.sunshine-live.de/",
         "ext": "mp3",
+        # Nur zur Abschaetzung des Platzbedarfs, nicht fuer die Aufnahme selbst.
+        "bitrate_kbps": 192,
     },
 }
+
+DEFAULT_BITRATE_KBPS = 192
 
 
 def get_station(key):
