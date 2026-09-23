@@ -1,0 +1,11 @@
+{
+    "jobs": [
+      {
+        "name": "Test",
+        "stream_url": "https://sunsl.streamabc.net/sunsl-sslsimulcast-mp3-192-4434053",
+        "time_start": "22:05",
+        "time_end": "22:10",
+        "save_path": "/data/recordings/abendprogramm"
+      }
+    ]
+  }

@@ -1,0 +1,20 @@
+# Radio Recorder Panel Konfiguration
+# Fügen Sie dies zu Ihrer Home Assistant configuration.yaml hinzu
+
+panel_custom:
+  - name: radio-recorder
+    sidebar_title: Radio Recorder
+    sidebar_icon: mdi:radio
+    url_path: radio-recorder
+    webcomponent_path: /local/radio-recorder.js
+    embed_iframe: true
+    require_admin: true
+
+# Oder als separates Dashboard:
+# 
+# In Lovelace: Einstellungen → Dashboards → Neues Dashboard
+# Name: Radio Recorder
+# Dann fügen Sie eine "Custom"-Karte hinzu mit:
+# type: custom:panel-frame
+# url: /radio-recorder
+

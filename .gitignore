@@ -1,0 +1,25 @@
+# Zugangsdaten - niemals ins Repo
+.smbcredentials
+*.credentials
+secrets.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Laufzeitdaten des Add-ons
+/data/*.db
+/data/*.db-journal
+/data/work/
+/recordings/
+*.mp3
+*.aac
+*.m4a
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

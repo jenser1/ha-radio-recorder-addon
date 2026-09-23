@@ -1,0 +1,50 @@
+# Radio Recorder Lovelace Card
+# Fügen Sie diese Karte zu Ihrer Lovelace-Ansicht hinzu
+# Über: Einstellungen → Dashboards → Karte hinzufügen → Manuell
+
+type: markdown
+content: |
+  ## 📻 Radio Recorder
+  
+  ### Aktive Jobs verwalten
+  
+  Um Jobs hinzuzufügen oder zu bearbeiten, gehen Sie zu:
+  
+  **[Supervisor → Add-ons → Radio Recorder → Configuration](https://homeassistant.local:8123/config/addons/dashboard/radio_recorder)**
+  
+  ### Beispiel-Konfiguration:
+  
+  ```yaml
+  jobs:
+    - name: "Mein Radio"
+      stream_url: "https://stream.example.com/radio.mp3"
+      save_path: "/share/Musick"
+      time_start: "10:00"
+      time_end: "11:00"
+      weekdays:
+        - "mo"
+        - "di"
+        - "mi"
+        - "do"
+        - "fr"
+      date_start: "2025-12-11"
+      date_end: "2025-12-31"
+  ```
+  
+  ### Speicherort
+  
+  Aufnahmen werden im Music Assistant Speicherpfad gespeichert:
+  - `/config/music` oder
+  - `/share/Musick` (falls als Remote Share gemountet)
+  
+  Dateiformat: `{name}_{YYYY-MM-DD_HH-MM}.mp3`
+
+card_mod:
+  style: |
+    ha-card {
+      background: var(--card-background-color);
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+    }
+

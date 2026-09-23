@@ -1,0 +1,82 @@
+title: Radio Recorder Jobs
+path: radio-recorder
+icon: mdi:radio
+cards:
+  - type: entities
+    title: Aktive Jobs
+    entities:
+      - entity: sensor.radio_recorder_jobs_count
+        name: Anzahl Jobs
+      - entity: sensor.radio_recorder_next_recording
+        name: Nächste Aufnahme
+    card_mod:
+      style: |
+        ha-card {
+          background: var(--card-background-color);
+          border-radius: 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+  - type: markdown
+    content: |
+      ## 📻 Radio Recorder Jobs verwalten
+      
+      Verwenden Sie die Add-on-Konfiguration, um Jobs hinzuzufügen oder zu bearbeiten:
+      
+      1. Gehen Sie zu **Supervisor → Add-ons → Radio Recorder → Configuration**
+      2. Fügen Sie Jobs im YAML-Format hinzu
+      
+      ### Beispiel-Konfiguration:
+      ```yaml
+      jobs:
+        - name: "Mein Radio"
+          stream_url: "https://stream.example.com/radio.mp3"
+          save_path: "/share/Musick"
+          time_start: "10:00"
+          time_end: "11:00"
+          weekdays:
+            - "mo"
+            - "di"
+            - "mi"
+            - "do"
+            - "fr"
+          date_start: "2025-12-11"
+          date_end: "2025-12-31"
+      ```
+      
+      ### Verfügbare Felder:
+      - **name**: Name des Jobs
+      - **stream_url**: URL des Radio-Streams
+      - **save_path**: Speicherpfad (Standard: Music Assistant Pfad)
+      - **time_start**: Startzeit im Format HH:MM
+      - **time_end**: Endzeit im Format HH:MM
+      - **weekdays**: Liste von Wochentagen (mo, di, mi, do, fr, sa, so)
+      - **date_start**: Startdatum (optional, Format: YYYY-MM-DD oder DD.MM.YYYY)
+      - **date_end**: Enddatum (optional, Format: YYYY-MM-DD oder DD.MM.YYYY)
+
+  - type: button
+    name: Add-on Konfiguration öffnen
+    tap_action:
+      action: navigate
+      navigation_path: /config/addons/dashboard/radio_recorder
+    icon: mdi:cog
+    show_state: false
+
+  - type: markdown
+    content: |
+      ## 📁 Speicherort
+      
+      Aufnahmen werden standardmäßig im Music Assistant Speicherpfad gespeichert:
+      - `/config/music` oder
+      - `/share/Musick` (falls als Remote Share gemountet)
+      
+      Die Dateien werden im Format gespeichert:
+      `{name}_{YYYY-MM-DD_HH-MM}.mp3`
+
+  - type: history-graph
+    title: Letzte Aufnahmen
+    entities:
+      - sensor.radio_recorder_last_recording
+    hours_to_show: 24
+    refresh_interval: 60
+

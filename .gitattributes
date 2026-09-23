@@ -1,0 +1,5 @@
+# Add-on laeuft unter Linux/Alpine -> immer LF, nie CRLF
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.mp3 binary
