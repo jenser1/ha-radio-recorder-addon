@@ -60,6 +60,19 @@ def warte_auf_zustand(rid, nicht=("running",), timeout=30):
     return db.get_recording(rid)
 
 
+print("\n=== 0. Dateien sind fuer Linux brauchbar ===")
+# Windows-Zeilenenden in run.sh machen aus der Shebang "bashio\r". s6 meldet
+# dann nur "exec: fatal: unable to exec bashio" und das Add-on startet nicht.
+for name in ("run.sh", "Dockerfile", "config.yaml"):
+    roh = (PROJECT / name).read_bytes()
+    pruefe(b"\r\n" not in roh, f"{name} hat Unix-Zeilenenden",
+           "-> CRLF gefunden, Add-on wird nicht starten")
+
+shebang = (PROJECT / "run.sh").read_bytes().split(b"\n")[0]
+pruefe(shebang == b"#!/usr/bin/with-contenv bashio",
+       "Shebang von run.sh ist unversehrt", f"-> {shebang!r}")
+
+
 print("\n=== 1. Datenbank und Uebernahme alter Zeitplaene ===")
 db.init()
 jobs = db.list_jobs()
