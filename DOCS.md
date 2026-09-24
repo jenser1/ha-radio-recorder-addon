@@ -20,6 +20,64 @@ Datei bleibt als `jobs.json.uebernommen` liegen.
 | `min_free_mb` | So viel Platz soll frei bleiben. Wird vor dem Start geprüft und während der Aufnahme überwacht. Vorgabe 500. |
 | `work_dir` | Optional. Ablage der Zwischenstücke. Ohne Angabe `/data/work`. |
 
+## Sender
+
+Sender werden in der Oberfläche unter **Sender** verwaltet. Zwei Wege:
+
+**Suche.** Das Suchfeld fragt [radio-browser.info](https://www.radio-browser.info)
+ab, ein offenes Verzeichnis mit rund 50.000 Internetradios. Keine Anmeldung,
+kein Schlüssel; das Add-on braucht dafür Zugang zum Internet. Ein Treffer wird
+erst übernommen, wenn er ausgewählt wurde.
+
+**Von Hand.** Name und Stream-Adresse eintragen. Bleibt der Name leer, wird er
+aus dem Stream gelesen (`icy-name`).
+
+In beiden Fällen wird der Stream einmal mit `ffprobe` geprüft, um Codec und
+Bitrate zu ermitteln. Das dauert ein paar Sekunden. Antwortet der Stream
+nicht, wird der Sender trotzdem angelegt - dann gilt vorerst MP3 mit
+192 kbit/s, und die Prüfung lässt sich später über 🔄 wiederholen.
+
+### Warum der Codec wichtig ist
+
+Aufgenommen wird mit `-c:a copy`, der Ton wird also unverändert
+durchgereicht. Steckt im Stream AAC, muss auch die Datei ein AAC-Behältnis
+sein - eine `.mp3` mit AAC-Inhalt wäre unbrauchbar. Die Endung richtet sich
+deshalb nach dem erkannten Codec:
+
+| Codec | Datei |
+|---|---|
+| mp3 | `.mp3` |
+| aac, aac_latm | `.aac` |
+| vorbis | `.ogg` |
+| opus | `.opus` |
+| flac | `.flac` |
+
+Ein Sender lässt sich nicht löschen, solange ein Zeitplan ihn verwendet.
+Bereits erstellte Aufnahmen bleiben davon unberührt.
+
+## Zeitpläne
+
+Die Dauer lässt sich auf zwei Arten angeben:
+
+* **Dauer** in Stunden und Minuten.
+* **Endzeit** als Uhrzeit. Liegt sie vor der Startzeit, wird bis zum nächsten
+  Tag aufgenommen - „22:00 bis 02:00" ergibt vier Stunden.
+
+Dazu kommen **Vorlauf** und **Nachlauf** in Minuten, falls eine Sendung
+erfahrungsgemäß etwas früher beginnt oder später endet. Der Vorlauf zieht den
+Start vor, der Nachlauf verlängert die Aufnahme. Reicht der Vorlauf über
+Mitternacht zurück, wandert der Wochentag mit: „Montag 00:01" mit fünf
+Minuten Vorlauf startet sonntags um 23:56.
+
+## Bibliothek
+
+Unter **Bibliothek** stehen alle abgeschlossenen Aufnahmen mit Abspielleiste,
+Download und Löschen. Gelöscht wird nach Rückfrage, und zwar endgültig - es
+gibt keinen Papierkorb.
+
+Ausgeliefert wird ausschließlich, was im eingestellten Zielordner liegt.
+Zeigt ein Eintrag auf eine Datei außerhalb, wird sie nicht ausgeliefert.
+
 ## Wie eine Aufnahme abläuft
 
 Während der Aufnahme wird nicht direkt in die Zieldatei geschrieben, sondern
@@ -81,6 +139,21 @@ laufen Zeitpläne in UTC - dann die Zeitzone in Home Assistant prüfen
 | fertig | regulär bis zur geplanten Endzeit gelaufen |
 | abgebrochen | vorzeitig gestoppt, Teilaufnahme wurde gespeichert |
 | fehlgeschlagen | keine verwertbaren Daten, Ursache wird angezeigt |
+
+## Version 0.4.0
+
+- Beliebig viele Sender, verwaltet in der Datenbank statt fest im Code
+- Sendersuche über radio-browser.info
+- Codec und Bitrate werden aus dem Stream ermittelt, die Dateiendung richtet
+  sich danach
+- Zeitpläne wahlweise über Dauer oder Endzeit, mit Vor- und Nachlauf
+- Bibliothek mit Abspielen, Herunterladen und Löschen
+- Oberfläche auf drei Seiten aufgeteilt
+- Eingaben außerhalb des zulässigen Bereichs werden abgelehnt statt
+  stillschweigend gekürzt
+
+Bestehende Zeitpläne und Aufnahmen werden beim Update übernommen; der bisher
+fest eingebaute Sender wird als erster Eintrag angelegt.
 
 ## Version 0.3.1
 

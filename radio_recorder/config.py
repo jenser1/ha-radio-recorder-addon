@@ -13,7 +13,6 @@ __all__ = [
     "SEGMENT_MINUTES", "MAX_DURATION_MINUTES", "PORT", "STATIONS",
     "MAX_STREAM_RETRIES", "RETRY_BACKOFF_SECONDS", "SHUTDOWN_TIMEOUT",
     "FFMPEG", "MIN_FREE_MB", "SPACE_CHECK_SECONDS", "DEFAULT_BITRATE_KBPS",
-    "get_station", "station_choices",
 ]
 
 
@@ -114,16 +113,3 @@ STATIONS = {
 }
 
 DEFAULT_BITRATE_KBPS = 192
-
-
-def get_station(key):
-    """Liefert die Senderdaten oder loest ``ValueError`` aus."""
-    try:
-        return STATIONS[key]
-    except KeyError:
-        raise ValueError(f"Unbekannter Sender: {key!r}") from None
-
-
-def station_choices():
-    """Sender als Liste fuer Auswahlfelder."""
-    return [(key, st["name"]) for key, st in STATIONS.items()]

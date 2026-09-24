@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block inhalt %}
+
+<div class="card">
+  <h2>Sender suchen</h2>
+  <form method="get" action="{{ base }}stations">
+    <div class="grid">
+      <div style="grid-column:1/-1">
+        <label for="q">Name des Senders</label>
+        <input id="q" name="q" value="{{ suchbegriff or '' }}"
+               placeholder="z. B. sunshine, deutschlandfunk, jazz" autofocus>
+      </div>
+    </div>
+    <p><button type="submit">🔎 Im Verzeichnis suchen</button>
+       <span class="small">durchsucht radio-browser.info</span></p>
+  </form>
+
+  {% if suchfehler %}
+    <p class="err">⚠ {{ suchfehler }}</p>
+  {% elif treffer is not none %}
+    {% if treffer %}
+    <table>
+      <tr><th>Sender</th><th class="hide-s">Format</th><th></th></tr>
+      {% for t in treffer %}
+      <tr>
+        <td>
+          {{ t.name }}
+          {% if t.country %}<span class="small"> · {{ t.country }}</span>{% endif %}
+          <br><span class="mono">{{ t.url }}</span>
+        </td>
+        <td class="hide-s small">
+          {{ t.codec or '?' }}{% if t.bitrate_kbps %}<br>{{ t.bitrate_kbps }} kbit/s{% endif %}
+        </td>
+        <td>
+          <form method="post" action="{{ base }}stations/add">
+            <input type="hidden" name="name" value="{{ t.name }}">
+            <input type="hidden" name="url" value="{{ t.url }}">
+            <input type="hidden" name="country" value="{{ t.country or '' }}">
+            <input type="hidden" name="homepage" value="{{ t.homepage or '' }}">
+            <input type="hidden" name="source" value="radio-browser">
+            <button class="klein">Übernehmen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="small">Beim Übernehmen wird der Stream kurz geprüft, um Codec
+       und Bitrate zu ermitteln. Das dauert einen Moment.</p>
+    {% else %}
+    <p class="small">Keine Treffer für „{{ suchbegriff }}“.</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Sender von Hand eintragen</h2>
+  <form method="post" action="{{ base }}stations/add">
+    <div class="grid">
+      <div>
+        <label for="n-name">Name</label>
+        <input id="n-name" name="name" placeholder="z. B. Deutschlandfunk">
+      </div>
+      <div style="grid-column:1/-1">
+        <label for="n-url">Stream-Adresse</label>
+        <input id="n-url" name="url" placeholder="https://..." required>
+      </div>
+    </div>
+    <p><button type="submit">➕ Sender anlegen</button>
+       <span class="small">Bleibt der Name leer, wird er aus dem Stream gelesen.</span></p>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Eingetragene Sender</h2>
+  {% if stations %}
+  <table>
+    <tr>
+      <th>Name</th><th class="hide-s">Format</th><th>Adresse</th><th></th>
+    </tr>
+    {% for st in stations %}
+    <tr>
+      <td>
+        {{ st.name }}
+        {% if st.country %}<br><span class="small">{{ st.country }}</span>{% endif %}
+      </td>
+      <td class="hide-s small">
+        {{ st.codec or '?' }} · .{{ st.ext }}<br>{{ st.bitrate_kbps }} kbit/s
+      </td>
+      <td><span class="mono">{{ st.url }}</span></td>
+      <td>
+        <div class="row">
+          <form method="post" action="{{ base }}stations/recheck/{{ st.key }}">
+            <button class="ghost klein" title="Stream erneut prüfen">🔄</button>
+          </form>
+          <form method="post" action="{{ base }}stations/delete/{{ st.key }}"
+                onsubmit="return confirm('Sender „{{ st.name }}“ löschen?')">
+            <button class="danger klein">🗑</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="small">Noch keine Sender eingetragen.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block inhalt %}
+
+<div class="card">
+  <h2>Aufnahmen</h2>
+  {% if recordings %}
+  <p class="small">
+    {{ recordings | length }} Aufnahme(n) · {{ gesamt | groesse }} belegt
+  </p>
+  <table>
+    <tr>
+      <th>Status</th><th>Sender</th><th>Beginn</th>
+      <th class="hide-s">Dauer</th><th>Größe</th><th></th>
+    </tr>
+    {% for item in recordings %}
+    <tr>
+      <td><span class="badge {{ item.state }}">{{ item.state_label }}</span></td>
+      <td>
+        {{ item.station_name }}
+        {% if item.label %}<br><span class="small">{{ item.label }}</span>{% endif %}
+      </td>
+      <td class="small">{{ item.started_at | uhrzeit }}</td>
+      <td class="hide-s small">{{ item.duration_text }}</td>
+      <td class="small">{{ item.size_bytes | groesse }}</td>
+      <td>
+        <div class="row">
+          {% if item.vorhanden %}
+          <a href="{{ base }}recordings/download/{{ item.id }}">
+            <button class="ghost klein" type="button" title="Herunterladen">⬇</button>
+          </a>
+          {% endif %}
+          <form method="post" action="{{ base }}recordings/delete/{{ item.id }}"
+                onsubmit="return confirm('Aufnahme endgültig löschen?\n\n{{ item.dateiname }}')">
+            <button class="danger klein" title="Löschen">🗑</button>
+          </form>
+        </div>
+      </td>
+    </tr>
+    {% if item.error %}
+    <tr><td colspan="6" class="err">⚠ {{ item.error }}</td></tr>
+    {% elif item.vorhanden %}
+    <tr>
+      <td colspan="6">
+        <span class="mono">{{ item.output_file }}</span>
+        <audio controls preload="none"
+               src="{{ base }}recordings/play/{{ item.id }}"></audio>
+      </td>
+    </tr>
+    {% elif item.output_file %}
+    <tr><td colspan="6" class="err">
+      Datei nicht mehr vorhanden: <span class="mono">{{ item.output_file }}</span>
+    </td></tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="small">Noch keine abgeschlossenen Aufnahmen.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

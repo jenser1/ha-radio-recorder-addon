@@ -5,7 +5,7 @@ Zeitzone des Containers (UTC) und alle Zeitplaene waeren gegenueber der
 Home-Assistant-Anzeige verschoben.
 """
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -56,6 +56,52 @@ def validate_weekdays(values):
     if not valid:
         raise ValueError("Bitte mindestens einen Wochentag auswaehlen.")
     return valid
+
+
+def duration_from_end(start_time, end_time):
+    """Dauer in Minuten zwischen zwei Uhrzeiten, ueber Mitternacht hinweg."""
+    beginn_h, beginn_m = parse_start_time(start_time)
+    ende_h, ende_m = parse_start_time(end_time)
+    minuten = (ende_h * 60 + ende_m) - (beginn_h * 60 + beginn_m)
+    if minuten <= 0:
+        minuten += 24 * 60          # Endzeit liegt am naechsten Tag
+    return minuten
+
+
+def end_time_from_duration(start_time, minutes):
+    """Gegenstueck: Endzeit als HH:MM aus Startzeit und Dauer."""
+    stunde, minute = parse_start_time(start_time)
+    gesamt = (stunde * 60 + minute + int(minutes)) % (24 * 60)
+    return f"{gesamt // 60:02d}:{gesamt % 60:02d}"
+
+
+def shift_weekdays(weekdays, tage):
+    """Verschiebt eine Wochentagsauswahl um ``tage`` Tage."""
+    verschoben = {WEEKDAY_KEYS[(WEEKDAY_KEYS.index(k) + tage) % 7]
+                  for k in weekdays}
+    return [key for key in WEEKDAY_KEYS if key in verschoben]
+
+
+def effective_schedule(job):
+    """Rechnet Vor- und Nachlauf in den tatsaechlichen Start um.
+
+    Reicht der Vorlauf ueber Mitternacht zurueck, beginnt die Aufnahme am
+    Vortag - dann muss auch die Wochentagsauswahl mitwandern, sonst liefe
+    sie am falschen Tag.
+    """
+    stunde, minute = parse_start_time(job["start_time"])
+    vorlauf = max(0, int(job.get("lead_in_minutes") or 0))
+    nachlauf = max(0, int(job.get("lead_out_minutes") or 0))
+    weekdays = validate_weekdays(job["weekdays"])
+
+    bezug = date(2000, 1, 3)        # ein Montag, dient nur als Rechenhilfe
+    beginn = datetime(2000, 1, 3, stunde, minute) - timedelta(minutes=vorlauf)
+    versatz = (beginn.date() - bezug).days
+    if versatz:
+        weekdays = shift_weekdays(weekdays, versatz)
+
+    dauer = int(job["duration_minutes"]) + vorlauf + nachlauf
+    return beginn.hour, beginn.minute, weekdays, dauer
 
 
 def start():
@@ -114,8 +160,7 @@ def schedule(job):
     """Traegt einen einzelnen Zeitplan ein bzw. aktualisiert ihn."""
     if _scheduler is None:
         return
-    hour, minute = parse_start_time(job["start_time"])
-    weekdays = validate_weekdays(job["weekdays"])
+    hour, minute, weekdays, _dauer = effective_schedule(job)
     _scheduler.add_job(
         func=_fire,
         args=[job["id"]],
@@ -166,9 +211,10 @@ def _fire(job_id):
             return
 
     try:
+        _stunde, _minute, _tage, dauer = effective_schedule(job)
         recorder.start(
             station_key=job["station"],
-            duration_minutes=job["duration_minutes"],
+            duration_minutes=dauer,
             label=job["name"],
             job_id=job_id,
         )

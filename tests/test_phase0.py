@@ -63,10 +63,16 @@ def warte_auf_zustand(rid, nicht=("running",), timeout=30):
 print("\n=== 0. Dateien sind fuer Linux brauchbar ===")
 # Windows-Zeilenenden in run.sh machen aus der Shebang "bashio\r". s6 meldet
 # dann nur "exec: fatal: unable to exec bashio" und das Add-on startet nicht.
-for name in ("run.sh", "Dockerfile", "config.yaml"):
-    roh = (PROJECT / name).read_bytes()
-    pruefe(b"\r\n" not in roh, f"{name} hat Unix-Zeilenenden",
-           "-> CRLF gefunden, Add-on wird nicht starten")
+UEBERSPRINGEN = {".git", "legacy", "__pycache__", ".cursor"}
+mit_crlf = [
+    pfad.relative_to(PROJECT).as_posix()
+    for pfad in PROJECT.rglob("*")
+    if pfad.is_file()
+    and not any(teil in UEBERSPRINGEN for teil in pfad.parts)
+    and b"\r\n" in pfad.read_bytes()
+]
+pruefe(not mit_crlf, "Keine Datei hat Windows-Zeilenenden",
+       f"-> {mit_crlf}")
 
 shebang = (PROJECT / "run.sh").read_bytes().split(b"\n")[0]
 pruefe(shebang == b"#!/usr/bin/with-contenv bashio",
@@ -242,8 +248,11 @@ pruefe(antwort.status_code == 200, "Startseite laedt", f"-> {antwort.status_code
 seite = antwort.get_data(as_text=True)
 pruefe("Radio Recorder" in seite, "Ueberschrift vorhanden")
 pruefe("Alter Zeitplan" in seite, "Uebernommener Zeitplan wird angezeigt")
-pruefe("fehlgeschlagen" in seite, "Fehlgeschlagene Aufnahme wird angezeigt")
 pruefe("Europe/Berlin" in seite, "Zeitzone wird angezeigt")
+
+bibliothek = client.get("/recordings").get_data(as_text=True)
+pruefe("fehlgeschlagen" in bibliothek,
+       "Fehlgeschlagene Aufnahme wird in der Bibliothek angezeigt")
 
 gesundheit = client.get("/health").get_json()
 pruefe(gesundheit["ok"] is True and gesundheit["timezone"] == "Europe/Berlin",
@@ -284,7 +293,7 @@ pruefe(antwort.status_code in (302, 303), "Unbekannter Sender fuehrt nicht zum A
 print("\n=== 8. Lange Aufnahmen und Speicherplatz ===")
 from radio_recorder import recorder as recorder_mod            # noqa: E402
 
-station = config.get_station("sunshine_live")
+station = db.get_station("sunshine_live")
 pruefe(recorder_mod.estimate_bytes(station, 60) == 86_400_000,
        "Platzbedarf fuer eine Stunde bei 192 kbit/s",
        f"-> {recorder_mod.estimate_bytes(station, 60)}")

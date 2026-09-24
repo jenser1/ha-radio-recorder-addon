@@ -26,7 +26,7 @@ from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import config, db
+from . import config, db, probe
 
 # ffmpeg beendet sich nach SIGINT mit 255 - das ist kein Fehler.
 _SIGINT_EXIT_CODES = (0, 255)
@@ -35,8 +35,7 @@ _SIGINT_EXIT_CODES = (0, 255)
 # wird. Noetig, falls der Stream stockt und ffmpegs eigenes -t nicht greift.
 _END_GRACE_SECONDS = 60
 
-# Segmentformat je Dateiendung (ffmpeg muss den Muxer explizit kennen).
-_SEGMENT_FORMATS = {"mp3": "mp3", "aac": "adts", "ogg": "ogg", "opus": "ogg"}
+# Das Segmentformat je Dateiendung steht in probe.CODEC_MAP.
 
 # Kein Rueckgabewert von ffmpeg, sondern unser Kennzeichen dafuer, dass sich
 # das Programm gar nicht erst starten liess. Wiederholen waere hier zwecklos.
@@ -78,7 +77,9 @@ class Recorder:
 
     def start(self, station_key, duration_minutes, label="", job_id=None):
         """Startet eine neue Aufnahme und liefert deren Kennung."""
-        station = config.get_station(station_key)
+        station = db.get_station(station_key)
+        if station is None:
+            raise ValueError(f"Unbekannter Sender: {station_key!r}")
         duration = int(duration_minutes)
         if duration < 1 or duration > config.MAX_DURATION_MINUTES:
             raise ValueError(
@@ -307,7 +308,7 @@ class Recorder:
             "-c:a", "copy",
             "-t", str(int(remaining_seconds)),
             "-f", "segment",
-            "-segment_format", _SEGMENT_FORMATS.get(ext, ext),
+            "-segment_format", probe.segment_format_for(ext),
             "-segment_time", str(config.SEGMENT_MINUTES * 60),
             "-segment_start_number", str(start_number),
             "-reset_timestamps", "1",

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Recorder</title>
+<style>
+:root{
+  --bg:#111827; --card:#1f2937; --sunk:#0f172a; --line:#374151;
+  --text:#f3f4f6; --muted:#9ca3af; --accent:#2563eb; --danger:#b91c1c;
+  --ok:#15803d; --warn:#b45309;
+}
+*{box-sizing:border-box}
+/* "hidden" ist nur eine Browser-Vorgabe von display:none und wird sonst von
+   eigenen display-Angaben wie .grid ueberstimmt. */
+[hidden]{display:none !important}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);color:var(--text);margin:0;padding:20px;line-height:1.5}
+.wrap{max-width:980px;margin:auto}
+.card{background:var(--card);border-radius:14px;padding:18px;margin-bottom:16px;
+  box-shadow:0 4px 16px #0004}
+h1,h2,h3{margin-top:0}
+h1{font-size:1.6rem;margin-bottom:12px}
+h2{font-size:1.15rem}
+h3{font-size:1rem;color:var(--muted)}
+input,select,button{font:inherit;border-radius:9px;border:1px solid #4b5563;
+  padding:10px;background:var(--bg);color:#fff;width:100%}
+button{cursor:pointer;background:var(--accent);border:0;width:auto}
+button:hover{filter:brightness(1.12)}
+button.danger{background:var(--danger)}
+button.ghost{background:transparent;border:1px solid #4b5563}
+button.klein{padding:6px 10px;font-size:.85rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.small{font-size:.87rem;color:var(--muted)}
+.status{padding:12px 14px;background:var(--sunk);border-radius:10px;margin:10px 0;
+  border-left:4px solid var(--accent)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:9px;border-bottom:1px solid var(--line);
+  vertical-align:top}
+th{font-size:.8rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+label{display:block;margin-bottom:5px;font-size:.9rem;color:var(--muted)}
+.weekdays label{display:inline-flex;align-items:center;gap:5px;margin-right:12px;
+  color:var(--text);font-size:1rem}
+.weekdays input{width:auto}
+.badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.78rem;
+  white-space:nowrap}
+.badge.completed{background:var(--ok)}
+.badge.failed{background:var(--danger)}
+.badge.cancelled{background:var(--warn)}
+.badge.grau{background:#374151;color:var(--muted)}
+.flash{padding:11px 14px;border-radius:10px;margin-bottom:12px}
+.flash.error{background:#7f1d1d}
+.flash.ok{background:#14532d}
+.err{color:#fca5a5;font-size:.85rem;word-break:break-word}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.83rem;
+  color:var(--muted);word-break:break-all}
+nav{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+nav a{padding:8px 15px;border-radius:9px;text-decoration:none;color:var(--muted);
+  background:var(--card)}
+nav a.aktiv{background:var(--accent);color:#fff}
+nav a:hover{filter:brightness(1.15)}
+audio{width:100%;margin-top:8px;filter:invert(.92) hue-rotate(180deg)}
+footer{color:var(--muted);font-size:.82rem;text-align:center;padding:10px 0 30px}
+@media(max-width:560px){ body{padding:12px} .hide-s{display:none} }
+</style>
+</head>
+<body><div class="wrap">
+
+<h1>📻 Radio Recorder</h1>
+
+<nav>
+  <a href="{{ base }}" class="{{ 'aktiv' if seite == 'aufnahme' }}">Aufnahme</a>
+  <a href="{{ base }}stations" class="{{ 'aktiv' if seite == 'sender' }}">Sender</a>
+  <a href="{{ base }}recordings" class="{{ 'aktiv' if seite == 'bibliothek' }}">Bibliothek</a>
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+    <div class="flash {{ category }}">{{ message }}</div>
+  {% endfor %}
+{% endwith %}
+
+{% block inhalt %}{% endblock %}
+
+<footer>Version {{ version }} · Zeitzone: {{ timezone }}</footer>
+
+</div>
+{% block skript %}{% endblock %}
+</body>
+</html>
