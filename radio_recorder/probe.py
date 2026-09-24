@@ -42,7 +42,22 @@ def probe_stream(url):
     Liefert immer ein Wörterbuch. Konnte nichts ermittelt werden, steht in
     ``fehler`` der Grund und die uebrigen Werte sind Vorgaben - der Sender
     laesst sich dann trotzdem anlegen.
+
+    Das Ergebnis geht auch ins Protokoll: in der Oberflaeche ist es nur eine
+    kurzlebige Meldung, zum Nachsehen braucht es eine dauerhafte Spur.
     """
+    befund = _probe_stream(url)
+    if befund["fehler"]:
+        print(f"[probe] {url}: {befund['fehler']}", flush=True)
+    else:
+        print(f"[probe] {url}: {befund['codec']}, "
+              f"{befund['bitrate_kbps']} kbit/s -> .{befund['ext']}"
+              + (f", Name {befund['name']!r}" if befund["name"] else ""),
+              flush=True)
+    return befund
+
+
+def _probe_stream(url):
     ergebnis = {
         "codec": None,
         "ext": "mp3",
