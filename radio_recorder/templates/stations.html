@@ -29,7 +29,8 @@
           <br><span class="mono">{{ t.url }}</span>
         </td>
         <td class="hide-s small">
-          {{ t.codec or '?' }}{% if t.bitrate_kbps %}<br>{{ t.bitrate_kbps }} kbit/s{% endif %}
+          {{ t.codec or 'ohne Angabe' }}
+          {%- if t.bitrate_kbps %}<br>{{ t.bitrate_kbps }} kbit/s{% endif %}
         </td>
         <td>
           <form method="post" action="{{ base }}stations/add">
@@ -84,7 +85,13 @@
         {% if st.country %}<br><span class="small">{{ st.country }}</span>{% endif %}
       </td>
       <td class="hide-s small">
-        {{ st.codec or '?' }} · .{{ st.ext }}<br>{{ st.bitrate_kbps }} kbit/s
+        {% if st.codec %}
+          {{ st.codec }} · .{{ st.ext }}<br>{{ st.bitrate_kbps }} kbit/s
+        {% else %}
+          noch nicht geprüft<br>
+          <span title="Vorgabewerte, bis der Stream einmal geprüft wurde">
+            .{{ st.ext }} · {{ st.bitrate_kbps }} kbit/s angenommen</span>
+        {% endif %}
       </td>
       <td><span class="mono">{{ st.url }}</span></td>
       <td>
