@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PROJECT = HERE.parent
+PROJECT = HERE.parent / "radio_recorder"      # der Add-on-Ordner
 
 WORK = Path(tempfile.mkdtemp(prefix="rr_p1_"))
 os.environ["DATA_DIR"] = str(WORK / "data")

@@ -595,11 +595,23 @@ def _join_segments(segments, target, ext):
                            f"ffmpeg endete mit Code {result.returncode}")
 
 
-def _remove_dir(path):
-    try:
-        shutil.rmtree(path, ignore_errors=True)
-    except Exception:
-        pass
+def _remove_dir(path, versuche=3):
+    """Raeumt das Arbeitsverzeichnis weg.
+
+    Ein einzelner Versuch kann fehlschlagen, wenn eine Datei noch geoeffnet
+    ist oder der Datentraeger gerade nicht mitspielt. Bleibt der Ordner
+    liegen, belegt er still weiter Platz - deshalb wird es gemeldet.
+    """
+    ordner = Path(path)
+    for nummer in range(versuche):
+        shutil.rmtree(ordner, ignore_errors=True)
+        if not ordner.exists():
+            return True
+        if nummer < versuche - 1:
+            time.sleep(0.5)
+    print(f"[rec] Arbeitsordner {ordner} liess sich nicht raeumen - "
+          f"bitte gelegentlich von Hand loeschen", flush=True)
+    return False
 
 
 def _format_span(seconds):

@@ -14,7 +14,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-PROJECT = HERE.parent
+REPO = HERE.parent
+PROJECT = REPO / "radio_recorder"      # der Add-on-Ordner
 
 WORK = Path(tempfile.mkdtemp(prefix="rr_test_"))
 os.environ["DATA_DIR"] = str(WORK / "data")
@@ -65,8 +66,8 @@ print("\n=== 0. Dateien sind fuer Linux brauchbar ===")
 # dann nur "exec: fatal: unable to exec bashio" und das Add-on startet nicht.
 UEBERSPRINGEN = {".git", "legacy", "__pycache__", ".cursor"}
 mit_crlf = [
-    pfad.relative_to(PROJECT).as_posix()
-    for pfad in PROJECT.rglob("*")
+    pfad.relative_to(REPO).as_posix()
+    for pfad in REPO.rglob("*")
     if pfad.is_file()
     and not any(teil in UEBERSPRINGEN for teil in pfad.parts)
     and b"\r\n" in pfad.read_bytes()

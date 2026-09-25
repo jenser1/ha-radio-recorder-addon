@@ -1,0 +1,40 @@
+name: Rauchtests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Abhaengigkeiten installieren
+        run: pip install -r radio_recorder/requirements.txt
+
+      - name: Phase 0 - Fundament
+        run: python tests/test_phase0.py
+
+      - name: Phase 1 - Sender, Codec, Endzeit, Bibliothek
+        run: python tests/test_phase1.py
+
+  addon-pruefung:
+    runs-on: ubuntu-latest
+    # Nur zur Information: der Linter bemaengelt auch Kleinigkeiten wie ein
+    # fehlendes Symbol. Das soll den Durchlauf nicht rot faerben.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      # Prueft config.yaml gegen das Schema des Supervisors.
+      - name: Add-on-Konfiguration pruefen
+        uses: frenck/action-addon-linter@v2
+        with:
+          path: "./radio_recorder"
