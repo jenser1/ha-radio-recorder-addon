@@ -17,6 +17,13 @@ Zeitplan, bis zu 24 Stunden am Stück.
 
 Die vollständige Beschreibung steht im Reiter **Dokumentation**.
 
+## Unterstützen
+
+Das Add-on ist kostenlos. Wer etwas zurückgeben möchte:
+[paypal.me/jenser1](https://paypal.me/jenser1)
+
+Entwickelt mit [Claude Code](https://claude.com/claude-code).
+
 ## Rechtlicher Hinweis
 
 Mitschnitte fürs eigene Archiv sind in Deutschland als Privatkopie gedeckt

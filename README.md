@@ -5,6 +5,7 @@ Zeitplan, bis zu 24 Stunden am Stück.
 
 ![Version](https://img.shields.io/badge/Version-0.5.0-blue)
 ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-green)
+[![Erstellt mit Claude Code](https://img.shields.io/badge/Erstellt%20mit-Claude%20Code-d97757)](https://claude.com/claude-code)
 
 ## Installation
 
@@ -63,6 +64,21 @@ durch Platzhalter in `tests/` ersetzt, die Sendersuche wird abgefangen.
 **Wichtig:** Alle Dateien müssen Unix-Zeilenenden behalten. Mit CRLF wird aus
 der ersten Zeile von `run.sh` ein `bashio\r`, und das Add-on startet nicht
 mehr. Der Rauchtest prüft das mit, `.gitattributes` erzwingt es.
+
+## Unterstützen
+
+Das Add-on ist kostenlos und bleibt es. Wenn es dir nützt und du etwas
+zurückgeben möchtest:
+
+[![Spenden über PayPal](https://img.shields.io/badge/Spenden-PayPal-00457C?logo=paypal&logoColor=white)](https://paypal.me/jenser1)
+
+→ [paypal.me/jenser1](https://paypal.me/jenser1)
+
+## Entstehung
+
+Entwickelt mit [Claude Code](https://claude.com/claude-code). Die
+Commit-Historie zeigt den Weg von der ersten Fassung bis hierher, samt der
+Fehler, die unterwegs gefunden wurden.
 
 ## Lizenz
 
