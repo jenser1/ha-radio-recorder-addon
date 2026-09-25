@@ -25,7 +25,12 @@ def main():
     bitrate = BITRATEN.get(modus, "128000")
     print(json.dumps({
         "streams": [{"codec_name": modus, "bit_rate": bitrate}],
-        "format": {"bit_rate": bitrate, "tags": {"icy-name": "Test-Sender FM"}},
+        "format": {
+            "bit_rate": bitrate,
+            # Nur bei Dateien vorhanden, bei einem Stream waere das leer.
+            "duration": os.environ.get("RR_FAKE_DAUER", "5400.0"),
+            "tags": {"icy-name": "Test-Sender FM"},
+        },
     }))
     return 0
 

@@ -11,7 +11,9 @@ import os
 import signal
 import sys
 
-from radio_recorder import __version__, config, db, scheduler, web
+import threading
+
+from radio_recorder import __version__, config, db, library, scheduler, web
 from radio_recorder.recorder import recorder
 
 
@@ -43,6 +45,13 @@ def _install_signal_handlers():
             pass
 
 
+def _erster_suchlauf():
+    try:
+        library.scan()
+    except Exception as err:
+        print(f"[bibliothek] Suchlauf fehlgeschlagen: {err}", flush=True)
+
+
 def main():
     print(f"[start] Radio Recorder {__version__}", flush=True)
     print(f"[start] Zeitzone: {config.TIMEZONE or 'nicht gesetzt'}", flush=True)
@@ -56,6 +65,13 @@ def main():
         print(f"[start] {resumed} Aufnahme(n) fortgesetzt", flush=True)
 
     scheduler.start()
+
+    # Der Suchlauf liest jede noch unbekannte Datei einmal mit ffprobe an.
+    # Beim ersten Mal kann das dauern, deshalb laeuft er nebenher - die
+    # Oberflaeche ist sofort da und die Liste fuellt sich waehrenddessen.
+    threading.Thread(target=_erster_suchlauf, name="bibliothek-scan",
+                     daemon=True).start()
+
     _install_signal_handlers()
 
     app = web.create_app()

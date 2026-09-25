@@ -127,6 +127,59 @@ def _probe_stream(url):
     return ergebnis
 
 
+def probe_file(pfad):
+    """Liest Spieldauer und Codec einer fertigen Datei.
+
+    Anders als beim Stream geht das schnell, weil ffprobe nur den Kopf der
+    Datei liest. Bei Unlesbarkeit steht in ``fehler`` der Grund.
+    """
+    ergebnis = {"duration_seconds": None, "codec": None,
+                "bitrate_kbps": None, "fehler": None}
+
+    befehl = [
+        *_ffprobe_befehl(),
+        "-v", "error",
+        "-select_streams", "a:0",
+        "-show_entries", "stream=codec_name:format=duration,bit_rate",
+        "-of", "json",
+        str(pfad),
+    ]
+
+    try:
+        lauf = subprocess.run(befehl, capture_output=True, text=True,
+                              errors="replace", timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as err:
+        ergebnis["fehler"] = f"ffprobe nicht nutzbar ({err})"
+        return ergebnis
+
+    if lauf.returncode != 0:
+        ergebnis["fehler"] = (lauf.stderr or "").strip()[-200:] or "unlesbar"
+        return ergebnis
+
+    try:
+        daten = json.loads(lauf.stdout or "{}")
+    except json.JSONDecodeError:
+        ergebnis["fehler"] = "Antwort von ffprobe unlesbar"
+        return ergebnis
+
+    format_teil = daten.get("format") or {}
+    try:
+        dauer = float(format_teil.get("duration"))
+        ergebnis["duration_seconds"] = dauer if dauer > 0 else None
+    except (TypeError, ValueError):
+        pass
+
+    spuren = daten.get("streams") or []
+    if spuren:
+        ergebnis["codec"] = spuren[0].get("codec_name")
+
+    bitrate = _erste_zahl(format_teil.get("bit_rate"))
+    if bitrate:
+        ergebnis["bitrate_kbps"] = max(8, round(bitrate / 1000))
+
+    return ergebnis
+
+
 def _ffprobe_befehl():
     """ffprobe liegt neben ffmpeg - auch wenn der Aufruf ersetzt wurde."""
     aufruf = list(config.FFMPEG)

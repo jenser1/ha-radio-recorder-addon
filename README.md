@@ -3,7 +3,7 @@
 Zeichnet Internetradio zeitgesteuert mit FFmpeg auf – manuell oder nach
 Zeitplan, bis zu 24 Stunden am Stück.
 
-![Version](https://img.shields.io/badge/Version-0.4.0-blue)
+![Version](https://img.shields.io/badge/Version-0.5.0-blue)
 ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-green)
 
 ## Installation
@@ -29,7 +29,8 @@ Updates kommen danach wie bei jedem anderen Add-on über den Store.
   sich danach
 * Zeitpläne nach Wochentag, wahlweise über Dauer oder Endzeit, mit Vor- und
   Nachlauf, pausierbar
-* Bibliothek mit Abspielen, Herunterladen und Löschen
+* Bibliothek mit Abspielen, Herunterladen und Löschen; vorhandene
+  Dateien im Zielordner werden von selbst aufgenommen
 * Angefangene Aufnahmen überstehen einen Neustart des Add-ons
 * Speicherplatz wird vor dem Start geprüft und während der Aufnahme überwacht
 

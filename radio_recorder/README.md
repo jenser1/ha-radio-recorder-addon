@@ -10,7 +10,8 @@ Zeitplan, bis zu 24 Stunden am Stück.
   sich danach
 * Zeitpläne nach Wochentag, wahlweise über Dauer oder Endzeit, mit Vor- und
   Nachlauf, pausierbar
-* Bibliothek mit Abspielen, Herunterladen und Löschen
+* Bibliothek mit Abspielen, Herunterladen und Löschen; vorhandene
+  Dateien im Zielordner werden von selbst aufgenommen
 * Angefangene Aufnahmen überstehen einen Neustart des Add-ons
 * Speicherplatz wird vor dem Start geprüft und während der Aufnahme überwacht
 

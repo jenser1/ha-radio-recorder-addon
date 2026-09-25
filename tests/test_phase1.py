@@ -9,6 +9,7 @@ import shutil
 import sqlite3
 import sys
 import tempfile
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -85,7 +86,11 @@ pruefe(len(db.list_stations()) == 1,
 with db.connect() as conn:
     stand = conn.execute(
         "SELECT value FROM meta WHERE key='schema_version'").fetchone()["value"]
-pruefe(stand == "2", "Schema-Stand ist jetzt 2", f"-> {stand}")
+    spalten = {row["name"] for row in conn.execute("PRAGMA table_info(recordings)")}
+pruefe(stand == str(db.SCHEMA_VERSION),
+       f"Schema-Stand ist jetzt {db.SCHEMA_VERSION}", f"-> {stand}")
+pruefe("discovered" in spalten,
+       "Spalte fuer gefundene Aufnahmen wurde nachgezogen", f"-> {spalten}")
 
 db._initialised = False
 db.init()
@@ -402,6 +407,103 @@ pruefe(antwort.status_code == 404, "Unbekannte Aufnahme liefert 404",
 gesundheit = client.get("/health").get_json()
 pruefe(gesundheit["stations"] == len(db.list_stations()),
        "health meldet die Zahl der Sender", f"-> {gesundheit}")
+
+
+# --------------------------------------------------------------------------
+print("\n=== 7. Vorhandene Aufnahmen im Zielordner aufspueren ===")
+
+from radio_recorder import library                              # noqa: E402
+
+ALT = time.time() - 7200          # zwei Stunden alt, also nicht "frisch"
+
+
+def datei_anlegen(name, inhalt=b"\xff\xfb" + b"\x00" * 3000, alter=ALT):
+    pfad = config.OUTPUT_DIR / name
+    pfad.parent.mkdir(parents=True, exist_ok=True)
+    pfad.write_bytes(inhalt)
+    os.utime(pfad, (alter, alter))
+    return pfad
+
+
+# Aufraeumen, damit der Suchlauf auf einem bekannten Stand aufsetzt.
+for uebrig in config.OUTPUT_DIR.rglob("*"):
+    if uebrig.is_file():
+        uebrig.unlink()
+for eintrag in db.list_recordings(limit=500):
+    db.delete_recording(eintrag["id"])
+
+db.add_station(name="SUNSHINE LIVE", url="https://example.invalid/ssl",
+               key="ssl_test")
+db.add_station(name="SUNSHINE LIVE Classics",
+               url="https://example.invalid/sslc", key="sslc_test")
+
+eigene = datei_anlegen("SUNSHINE_LIVE_Clubnacht_2026-09-19_22-00-00.mp3")
+classics = datei_anlegen("SUNSHINE_LIVE_Classics_2026-09-18_20-30-00.mp3")
+fremd = datei_anlegen("Irgendwas anderes.mp3")
+leer = datei_anlegen("Leer.mp3", inhalt=b"")
+frisch = datei_anlegen("Gerade_erst_2026-09-20_10-00-00.mp3", alter=time.time())
+kein_ton = datei_anlegen("Notiz.txt", inhalt=b"kein Ton")
+
+gefunden, uebersprungen = library.scan()
+pruefe(gefunden == 3, "Drei Aufnahmen neu erfasst", f"-> {gefunden}")
+pruefe(uebersprungen == 2, "Leere und frische Datei uebersprungen",
+       f"-> {uebersprungen}")
+
+eintraege = {Path(e["output_file"]).name: e
+             for e in db.list_recordings(limit=50) if e["output_file"]}
+pruefe(kein_ton.name not in eintraege, "Nicht-Audiodatei wird ignoriert")
+pruefe(frisch.name not in eintraege, "Gerade geschriebene Datei bleibt aussen vor")
+
+a = eintraege.get(eigene.name)
+pruefe(a and a["station_name"] == "SUNSHINE LIVE" and a["label"] == "Clubnacht",
+       "Sender und Bezeichnung aus dem Dateinamen gelesen",
+       f"-> {a['station_name']!r} / {a['label']!r}" if a else "-> fehlt")
+pruefe(a and a["started_at"].startswith("2026-09-19T22:00"),
+       "Beginn aus dem Zeitstempel gelesen",
+       f"-> {a['started_at'] if a else None}")
+pruefe(a and a["discovered"] == 1, "Eintrag ist als gefunden gekennzeichnet")
+pruefe(a and a["state"] == "completed", "Gefundene Aufnahme gilt als fertig")
+pruefe(a and a["size_bytes"] == eigene.stat().st_size, "Groesse stimmt")
+
+# 5400 Sekunden aus dem ffprobe-Platzhalter = 90 Minuten.
+dauer = None
+if a and a["ended_at"]:
+    dauer = (datetime.fromisoformat(a["ended_at"])
+             - datetime.fromisoformat(a["started_at"])).total_seconds()
+pruefe(dauer == 5400, "Spieldauer kommt aus ffprobe", f"-> {dauer}")
+
+c = eintraege.get(classics.name)
+pruefe(c and c["station_name"] == "SUNSHINE LIVE Classics" and c["label"] == "",
+       "Laengster Sendername gewinnt, nicht der kuerzere Anfang",
+       f"-> {c['station_name']!r} / {c['label']!r}" if c else "-> fehlt")
+
+f = eintraege.get(fremd.name)
+pruefe(f and f["station_name"] == "Irgendwas anderes",
+       "Fremde Benennung wird als Name uebernommen",
+       f"-> {f['station_name']!r}" if f else "-> fehlt")
+pruefe(f and f["started_at"][:4] == "2026",
+       "Fremde Datei bekommt den Zeitpunkt der Datei")
+
+nochmal = library.scan()
+pruefe(nochmal[0] == 0, "Zweiter Suchlauf erfasst nichts doppelt",
+       f"-> {nochmal}")
+
+client.post("/recordings/scan")
+pruefe(len(db.list_recordings(limit=50)) == 3,
+       "Suchlauf ueber das Web verdoppelt nichts")
+
+datei_anlegen("SUNSHINE_LIVE_Spaeter_2026-09-21_08-00-00.mp3")
+client.post("/recordings/scan")
+pruefe(len(db.list_recordings(limit=50)) == 4,
+       "Neu hinzugekommene Datei wird nachtraeglich erfasst")
+
+seite = client.get("/recordings").get_data(as_text=True)
+pruefe("gefunden" in seite, "Gefundene Aufnahmen sind gekennzeichnet")
+pruefe("Zielordner durchsuchen" in seite, "Knopf fuer den Suchlauf ist da")
+
+leeres = library.scan(verzeichnis=WORK / "gibtesnicht")
+pruefe(leeres == (0, 0), "Fehlender Zielordner fuehrt nicht zum Absturz",
+       f"-> {leeres}")
 
 
 print("\n" + "=" * 62)

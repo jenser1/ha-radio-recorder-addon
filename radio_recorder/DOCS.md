@@ -78,6 +78,27 @@ gibt keinen Papierkorb.
 Ausgeliefert wird ausschließlich, was im eingestellten Zielordner liegt.
 Zeigt ein Eintrag auf eine Datei außerhalb, wird sie nicht ausgeliefert.
 
+### Vorhandene Dateien aufnehmen
+
+Beim Start durchsucht das Add-on den Zielordner nach Aufnahmen, die noch
+nicht in der Liste stehen, und trägt sie nach. Das betrifft Dateien aus einer
+früheren Fassung, aus einer anderen Installation oder von Hand
+hineinkopierte. Der Knopf **Zielordner durchsuchen** stößt das jederzeit
+erneut an.
+
+Solche Einträge tragen die Kennzeichnung **gefunden**. Ermittelt werden:
+
+* **Beginn und Bezeichnung** aus dem Dateinamen, sofern er dem Muster
+  `Sender_Bezeichnung_JJJJ-MM-TT_SS-MM-SS` folgt. Andernfalls dient der
+  Zeitpunkt der Datei als Beginn und der Dateiname als Bezeichnung.
+* **Spieldauer** über `ffprobe`.
+
+Übersprungen werden leere Dateien und solche, die in der letzten Minute
+geschrieben wurden - die könnten noch unfertig sein.
+
+Der erste Suchlauf liest jede Datei einmal an und kann bei vielen Aufnahmen
+etwas dauern. Er läuft nebenher, die Oberfläche ist sofort bedienbar.
+
 ## Wie eine Aufnahme abläuft
 
 Während der Aufnahme wird nicht direkt in die Zieldatei geschrieben, sondern
@@ -139,6 +160,18 @@ laufen Zeitpläne in UTC - dann die Zeitzone in Home Assistant prüfen
 | fertig | regulär bis zur geplanten Endzeit gelaufen |
 | abgebrochen | vorzeitig gestoppt, Teilaufnahme wurde gespeichert |
 | fehlgeschlagen | keine verwertbaren Daten, Ursache wird angezeigt |
+
+## Version 0.5.0
+
+- Der Zielordner wird beim Start nach Aufnahmen durchsucht, die noch nicht
+  in der Bibliothek stehen; solche Einträge sind als **gefunden**
+  gekennzeichnet
+- Knopf **Zielordner durchsuchen** für einen erneuten Durchlauf
+- Spieldauer gefundener Aufnahmen wird über `ffprobe` ermittelt
+- Ergebnis jeder Stream-Prüfung steht jetzt auch im Protokoll
+- Ungeprüfte Sender heißen „noch nicht geprüft" statt „?"
+- Arbeitsordner wird mehrfach zu räumen versucht und gemeldet, wenn er
+  liegenbleibt
 
 ## Version 0.4.0
 

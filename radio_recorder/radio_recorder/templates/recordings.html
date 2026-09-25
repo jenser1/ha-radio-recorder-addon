@@ -2,7 +2,13 @@
 {% block inhalt %}
 
 <div class="card">
-  <h2>Aufnahmen</h2>
+  <div class="row" style="justify-content:space-between;align-items:flex-start">
+    <h2 style="margin-bottom:0">Aufnahmen</h2>
+    <form method="post" action="{{ base }}recordings/scan">
+      <button class="ghost klein" title="Zielordner nach Aufnahmen durchsuchen,
+die noch nicht in der Liste stehen">🔎 Zielordner durchsuchen</button>
+    </form>
+  </div>
   {% if recordings %}
   <p class="small">
     {{ recordings | length }} Aufnahme(n) · {{ gesamt | groesse }} belegt
@@ -14,7 +20,13 @@
     </tr>
     {% for item in recordings %}
     <tr>
-      <td><span class="badge {{ item.state }}">{{ item.state_label }}</span></td>
+      <td>
+        <span class="badge {{ item.state }}">{{ item.state_label }}</span>
+        {% if item.discovered %}
+        <br><span class="badge grau" title="Im Zielordner gefunden, nicht von
+diesem Add-on aufgenommen">gefunden</span>
+        {% endif %}
+      </td>
       <td>
         {{ item.station_name }}
         {% if item.label %}<br><span class="small">{{ item.label }}</span>{% endif %}

@@ -7,7 +7,7 @@ from pathlib import Path
 from flask import (Flask, abort, flash, jsonify, redirect, render_template,
                    request, send_file)
 
-from . import __version__, config, db, directory, probe, scheduler
+from . import __version__, config, db, directory, library, probe, scheduler
 from . import recorder as recorder_mod
 from .recorder import recorder
 
@@ -270,6 +270,27 @@ def create_app():
 
         return render_template("recordings.html", seite="bibliothek",
                                recordings=eintraege, gesamt=gesamt)
+
+    @app.route("/recordings/scan", methods=["POST"])
+    def scan_recordings():
+        try:
+            gefunden, uebersprungen = library.scan()
+        except Exception as err:
+            flash(f"Suchlauf fehlgeschlagen: {err}", "error")
+            return redirect(_ingress_base() + "recordings")
+
+        if gefunden:
+            teile = [f"{gefunden} Aufnahme(n) neu erfasst"]
+            if uebersprungen:
+                teile.append(f"{uebersprungen} uebersprungen")
+            flash(", ".join(teile) + ".", "ok")
+        elif uebersprungen:
+            flash(f"Nichts Neues gefunden, {uebersprungen} Datei(en) "
+                  f"uebersprungen (leer oder gerade erst geschrieben).", "ok")
+        else:
+            flash("Nichts Neues gefunden - die Bibliothek ist vollstaendig.",
+                  "ok")
+        return redirect(_ingress_base() + "recordings")
 
     @app.route("/recordings/play/<rid>", methods=["GET"])
     def play_recording(rid):

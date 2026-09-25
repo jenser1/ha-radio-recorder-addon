@@ -14,7 +14,7 @@ from datetime import datetime
 
 from . import config
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _init_lock = threading.Lock()
 _initialised = False
@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS recordings (
     size_bytes    INTEGER NOT NULL DEFAULT 0,
     resume_count  INTEGER NOT NULL DEFAULT 0,
     retry_count   INTEGER NOT NULL DEFAULT 0,
-    error         TEXT
+    error         TEXT,
+    discovered    INTEGER NOT NULL DEFAULT 0   -- im Zielordner gefunden
 );
 
 CREATE INDEX IF NOT EXISTS idx_recordings_state   ON recordings(state);
@@ -155,6 +156,10 @@ def _upgrade(conn, vorher):
     for spalte, definition in nachzuziehen:
         if spalte not in vorhanden:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {spalte} {definition}")
+
+    if "discovered" not in _columns(conn, "recordings"):
+        conn.execute("ALTER TABLE recordings ADD COLUMN discovered "
+                     "INTEGER NOT NULL DEFAULT 0")
 
     print(f"[db] Datenbank von Stand {vorher} auf {SCHEMA_VERSION} gehoben",
           flush=True)
@@ -357,16 +362,27 @@ def _job_from_row(row):
 # --- Aufnahmen -----------------------------------------------------------
 
 def create_recording(recording_id, station_key, station_name, stream_url, ext,
-                     started_at, planned_end, work_dir, label="", job_id=None):
+                     started_at, planned_end, work_dir, label="", job_id=None,
+                     state="running", discovered=False):
     with connect() as conn:
         conn.execute(
             """INSERT INTO recordings
                (id, job_id, label, station_key, station_name, stream_url, ext,
-                state, started_at, planned_end, work_dir)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'running', ?, ?, ?)""",
+                state, started_at, planned_end, work_dir, discovered)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (recording_id, job_id, label, station_key, station_name, stream_url,
-             ext, started_at, planned_end, work_dir),
+             ext, state, started_at, planned_end, work_dir,
+             1 if discovered else 0),
         )
+
+
+def known_output_files():
+    """Alle bereits erfassten Zieldateien - fuer den Abgleich beim Suchlauf."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT output_file FROM recordings WHERE output_file IS NOT NULL"
+        ).fetchall()
+    return {row["output_file"] for row in rows if row["output_file"]}
 
 
 def update_recording(recording_id, **fields):
