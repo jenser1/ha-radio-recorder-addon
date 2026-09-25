@@ -359,7 +359,7 @@ class Recorder:
                 frei = free_bytes(work_dir)
                 if frei is not None and frei < config.MIN_FREE_MB * 1024 * 1024:
                     active.notice = (
-                        f"Aufnahme vorzeitig beendet: nur noch {_mb(frei)} "
+                        f"Aufnahme vorzeitig beendet: nur noch {format_size(frei)} "
                         f"frei im Arbeitsordner. Das bis dahin Aufgenommene "
                         f"wurde gespeichert.")
                     print(f"[rec {active.id}] {active.notice}", flush=True)
@@ -440,6 +440,23 @@ class Recorder:
 
 # --- Speicherplatz -------------------------------------------------------
 
+EINHEITEN = ("B", "KB", "MB", "GB", "TB", "PB")
+
+
+def format_size(value):
+    """Byte-Zahl lesbar machen.
+
+    Hier liegt die einzige Fassung dieser Rechnung: eine fruehere Variante
+    teilte beim Sprung auf die groesste Einheit einmal zu wenig und zeigte
+    bei einem Netzlaufwerk 7346 TB statt 7,2 TB an.
+    """
+    size = float(value or 0)
+    for einheit in EINHEITEN:
+        if size < 1024 or einheit == EINHEITEN[-1]:
+            return f"{int(size)} B" if einheit == "B" else f"{size:.1f} {einheit}"
+        size /= 1024
+
+
 def estimate_bytes(station, minutes):
     """Grobe Groesse einer Aufnahme. Der Stream liefert konstante Bitrate."""
     kbps = int(station.get("bitrate_kbps") or config.DEFAULT_BITRATE_KBPS)
@@ -495,18 +512,9 @@ def check_disk_space(station, minutes):
         if frei < bedarf + reserve:
             raise ValueError(
                 f"Zu wenig Speicherplatz im {bezeichnung} ({pfad}): "
-                f"gebraucht werden etwa {_mb(bedarf)}, frei sind {_mb(frei)} "
-                f"(davon sollen {_mb(reserve)} frei bleiben)."
+                f"gebraucht werden etwa {format_size(bedarf)}, frei sind {format_size(frei)} "
+                f"(davon sollen {format_size(reserve)} frei bleiben)."
             )
-
-
-def _mb(value):
-    size = float(value or 0)
-    for unit in ("B", "KB", "MB"):
-        if size < 1024:
-            return f"{size:.0f} {unit}" if unit == "B" else f"{size:.1f} {unit}"
-        size /= 1024
-    return f"{size:.1f} GB"
 
 
 # --- Hilfsfunktionen -----------------------------------------------------

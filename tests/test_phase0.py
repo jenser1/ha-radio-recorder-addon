@@ -210,6 +210,31 @@ pruefe("ffmpeg" in (fehlt["error"] or "").lower(),
        "Fehlertext nennt ffmpeg", f"-> {fehlt['error']!r}")
 
 
+print("\n=== 5c. Groessenangaben ===")
+from radio_recorder import recorder as recorder_modul              # noqa: E402
+
+for wert, erwartet in (
+        (0, "0 B"),
+        (512, "512 B"),
+        (1024, "1.0 KB"),
+        (1536, "1.5 KB"),
+        (1024 ** 2, "1.0 MB"),
+        (1024 ** 3, "1.0 GB"),
+        (1024 ** 4, "1.0 TB"),
+        # 7346,3 GB: genau der Wert, bei dem die Anzeige frueher 7346.3 TB
+        # meldete, weil einmal zu wenig geteilt wurde.
+        (int(7346.3 * 1024 ** 3), "7.2 TB"),
+        (5 * 1024 ** 4, "5.0 TB"),
+        (2 * 1024 ** 5, "2.0 PB"),
+):
+    ergebnis = recorder_modul.format_size(wert)
+    pruefe(ergebnis == erwartet, f"{wert} B wird als {erwartet} angezeigt",
+           f"-> {ergebnis}")
+
+pruefe(web.format_size is recorder_modul.format_size,
+       "Oberflaeche und Meldungen verwenden dieselbe Rechnung")
+
+
 print("\n=== 6. Scheduler und Zeitzone ===")
 tz = scheduler.resolve_timezone()
 pruefe(tz is not None and "Berlin" in str(tz), "Zeitzone wird aufgeloest",

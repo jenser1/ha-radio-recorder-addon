@@ -507,12 +507,6 @@ def format_duration(minutes):
     return f"{rest} Min."
 
 
-def format_size(value):
-    size = float(value or 0)
-    if size < 1024:
-        return f"{int(size)} B"
-    for unit in ("KB", "MB", "GB"):
-        size /= 1024
-        if size < 1024:
-            return f"{size:.1f} {unit}"
-    return f"{size:.1f} TB"
+# Die Rechnung steht nur einmal im Recorder - hier wird sie durchgereicht,
+# damit die Oberflaeche und die Meldungen nicht auseinanderlaufen koennen.
+format_size = recorder_mod.format_size

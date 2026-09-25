@@ -168,6 +168,8 @@ laufen Zeitpläne in UTC - dann die Zeitzone in Home Assistant prüfen
   gekennzeichnet
 - Knopf **Zielordner durchsuchen** für einen erneuten Durchlauf
 - Spieldauer gefundener Aufnahmen wird über `ffprobe` ermittelt
+- Größenangaben ab einem Terabyte waren um den Faktor 1024 zu hoch; ein
+  Netzlaufwerk mit 7,2 TB wurde als „7346,3 TB" angezeigt
 - Ergebnis jeder Stream-Prüfung steht jetzt auch im Protokoll
 - Ungeprüfte Sender heißen „noch nicht geprüft" statt „?"
 - Arbeitsordner wird mehrfach zu räumen versucht und gemeldet, wenn er
