@@ -2,7 +2,7 @@ name: "Radio Recorder"
 version: "0.5.0"
 slug: "radio_recorder"
 description: "Internetradio zeitgesteuert mit FFmpeg aufzeichnen"
-url: "https://github.com/jenser1/radio-recorder-addon"
+url: "https://github.com/jenser1/ha-radio-recorder-addon"
 arch:
   - amd64
   - aarch64

@@ -13,7 +13,7 @@ Zeitplan, bis zu 24 Stunden am Stück.
 3. Diese Adresse eintragen:
 
    ```
-   https://github.com/jenser1/radio-recorder-addon
+   https://github.com/jenser1/ha-radio-recorder-addon
    ```
 
 4. Den Store neu laden. **Radio Recorder** erscheint als neues Add-on und
