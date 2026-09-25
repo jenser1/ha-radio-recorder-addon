@@ -25,6 +25,9 @@ jobs:
       - name: Phase 1 - Sender, Codec, Endzeit, Bibliothek
         run: python tests/test_phase1.py
 
+      - name: Phase 3 - Titelerkennung
+        run: python tests/test_phase3.py
+
   addon-pruefung:
     runs-on: ubuntu-latest
     # Nur zur Information: der Linter bemaengelt auch Kleinigkeiten wie ein

@@ -14,7 +14,7 @@ from datetime import datetime
 
 from . import config
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _init_lock = threading.Lock()
 _initialised = False
@@ -36,7 +36,11 @@ CREATE TABLE IF NOT EXISTS stations (
     homepage     TEXT,
     source       TEXT    NOT NULL DEFAULT 'manual',
     created_at   TEXT    NOT NULL,
-    checked_at   TEXT
+    checked_at   TEXT,
+    -- Ergebnis der Titelerkennung: ok | keine | fehler, NULL = nie geprueft
+    metadata_state      TEXT,
+    metadata_checked_at TEXT,
+    metadata_sample     TEXT
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
@@ -161,6 +165,11 @@ def _upgrade(conn, vorher):
         conn.execute("ALTER TABLE recordings ADD COLUMN discovered "
                      "INTEGER NOT NULL DEFAULT 0")
 
+    vorhandene_sender = _columns(conn, "stations")
+    for spalte in ("metadata_state", "metadata_checked_at", "metadata_sample"):
+        if spalte not in vorhandene_sender:
+            conn.execute(f"ALTER TABLE stations ADD COLUMN {spalte} TEXT")
+
     print(f"[db] Datenbank von Stand {vorher} auf {SCHEMA_VERSION} gehoben",
           flush=True)
 
@@ -280,7 +289,8 @@ def add_station(name, url, ext="mp3", bitrate_kbps=None, codec=None,
 
 
 _STATION_FIELDS = {"name", "url", "ext", "codec", "bitrate_kbps",
-                   "country", "homepage", "checked_at"}
+                   "country", "homepage", "checked_at",
+                   "metadata_state", "metadata_checked_at", "metadata_sample"}
 
 
 def update_station(key, **fields):

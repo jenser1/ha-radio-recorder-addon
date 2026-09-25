@@ -7,7 +7,8 @@ from pathlib import Path
 from flask import (Flask, abort, flash, jsonify, redirect, render_template,
                    request, send_file)
 
-from . import __version__, config, db, directory, library, probe, scheduler
+from . import (__version__, config, db, directory, library, metadata, probe,
+               scheduler)
 from . import recorder as recorder_mod
 from .recorder import recorder
 
@@ -241,6 +242,41 @@ def create_app():
             )
             flash(f"{station['name']}: {befund['codec']}, "
                   f"{_bitrate_waehlen(befund)} kbit/s, .{befund['ext']}", "ok")
+        return redirect(_ingress_base() + "stations")
+
+    @app.route("/stations/metadata/<key>", methods=["POST"])
+    def check_metadata(key):
+        """Hoert kurz in den Sender und meldet, ob Titel ankommen."""
+        station = db.get_station(key)
+        if station is None:
+            flash("Diesen Sender gibt es nicht mehr.", "error")
+            return redirect(_ingress_base() + "stations")
+
+        befund = metadata.pruefe_sender(station["url"])
+        titel = befund["titel"]
+
+        if befund["fehler"] and not titel:
+            zustand, meldung = "fehler", befund["fehler"]
+            flash(f"{station['name']}: {meldung}", "error")
+        elif titel:
+            zustand = "ok"
+            meldung = " | ".join(titel[:5])
+            flash(f"{station['name']}: Titelerkennung moeglich. "
+                  f"In {befund['dauer']} Sekunden erkannt: {meldung}", "ok")
+        else:
+            zustand = "keine"
+            meldung = ""
+            flash(f"{station['name']}: Der Sender hat in "
+                  f"{befund['dauer']} Sekunden keinen Titel gemeldet. "
+                  f"Entweder liefert er keine Metadaten, oder es lief gerade "
+                  f"durchgehend dasselbe Stueck.", "error")
+
+        db.update_station(
+            key,
+            metadata_state=zustand,
+            metadata_checked_at=datetime.now().isoformat(timespec="seconds"),
+            metadata_sample="\n".join(befund["rohzeilen"][:10]) or meldung,
+        )
         return redirect(_ingress_base() + "stations")
 
     @app.route("/stations/delete/<key>", methods=["POST"])

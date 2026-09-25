@@ -36,6 +36,24 @@ def main():
     args = sys.argv[1:]
     out = args[-1]
 
+    # Pruefmodus der Titelerkennung: ffmpeg verwirft den Ton ("-f null") und
+    # soll nur melden, was an Metadaten hereinkommt.
+    if "null" in args and "-f" in args and args[args.index("-f") + 1] == "null":
+        # Windows kann keine leeren Umgebungsvariablen an Kindprozesse
+        # weiterreichen, deshalb gibt es "KEINE" als ausdrueckliches Wort.
+        roh = os.environ.get("RR_FAKE_TITEL")
+        if roh is None:
+            roh = "Artist A - Lied Eins|Artist B - Lied Zwei"
+        if roh == "KEINE":
+            roh = ""
+        if roh == "FEHLER":
+            sys.stderr.write("https://example/stream: Server returned 404 Not Found\n")
+            return 1
+        for titel in [t for t in roh.split("|") if t]:
+            sys.stderr.write(f"[http @ 0x1] Metadata update for StreamTitle: {titel}\n")
+        sys.stderr.flush()
+        return 0
+
     if "concat" in args:
         listing = arg(args, "-i")
         base = os.path.dirname(os.path.abspath(listing)) or os.getcwd()

@@ -93,11 +93,34 @@
             .{{ st.ext }} · {{ st.bitrate_kbps }} kbit/s angenommen</span>
         {% endif %}
       </td>
-      <td><span class="mono">{{ st.url }}</span></td>
+      <td>
+        <span class="mono">{{ st.url }}</span>
+        <div class="small" style="margin-top:5px">
+          {% if st.metadata_state == 'ok' %}
+            <span class="badge completed">Titelerkennung möglich</span>
+          {% elif st.metadata_state == 'keine' %}
+            <span class="badge cancelled">keine Titel gemeldet</span>
+          {% elif st.metadata_state == 'fehler' %}
+            <span class="badge failed">Prüfung fehlgeschlagen</span>
+          {% else %}
+            <span class="badge grau">Titelerkennung ungeprüft</span>
+          {% endif %}
+          {% if st.metadata_sample %}
+          <details style="margin-top:5px">
+            <summary style="cursor:pointer">Was der Sender meldet</summary>
+            <pre class="mono" style="white-space:pre-wrap;margin:5px 0 0">{{ st.metadata_sample }}</pre>
+          </details>
+          {% endif %}
+        </div>
+      </td>
       <td>
         <div class="row">
           <form method="post" action="{{ base }}stations/recheck/{{ st.key }}">
             <button class="ghost klein" title="Stream erneut prüfen">🔄</button>
+          </form>
+          <form method="post" action="{{ base }}stations/metadata/{{ st.key }}">
+            <button class="ghost klein" title="45 Sekunden mithören und prüfen,
+ob der Sender Titel meldet">🎵</button>
           </form>
           <form method="post" action="{{ base }}stations/delete/{{ st.key }}"
                 onsubmit="return confirm('Sender „{{ st.name }}“ löschen?')">

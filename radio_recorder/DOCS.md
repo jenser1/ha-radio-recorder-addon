@@ -37,6 +37,22 @@ Bitrate zu ermitteln. Das dauert ein paar Sekunden. Antwortet der Stream
 nicht, wird der Sender trotzdem angelegt - dann gilt vorerst MP3 mit
 192 kbit/s, und die Prüfung lässt sich später über 🔄 wiederholen.
 
+### Titelerkennung prüfen
+
+Der Knopf 🎵 in der Senderliste hört 45 Sekunden in den Strom und meldet,
+ob der Sender Titelwechsel mitschickt (ICY-Metadaten). Das Ergebnis steht
+danach als Kennzeichnung am Sender:
+
+| Kennzeichnung | Bedeutung |
+|---|---|
+| Titelerkennung möglich | Der Sender meldet Titel. Aufnahmen lassen sich später in Einzeltitel zerlegen. |
+| keine Titel gemeldet | In 45 Sekunden kam nichts. Entweder liefert der Sender keine Metadaten, oder es lief durchgehend dasselbe Stück. |
+| Prüfung fehlgeschlagen | Der Strom war nicht erreichbar. |
+| ungeprüft | Noch nicht nachgesehen. |
+
+Unter **Was der Sender meldet** stehen die Rohzeilen, so wie ffmpeg sie
+ausgibt. Dieselben Zeilen landen im Protokoll des Add-ons.
+
 ### Warum der Codec wichtig ist
 
 Aufgenommen wird mit `-c:a copy`, der Ton wird also unverändert
@@ -160,6 +176,11 @@ laufen Zeitpläne in UTC - dann die Zeitzone in Home Assistant prüfen
 | fertig | regulär bis zur geplanten Endzeit gelaufen |
 | abgebrochen | vorzeitig gestoppt, Teilaufnahme wurde gespeichert |
 | fehlgeschlagen | keine verwertbaren Daten, Ursache wird angezeigt |
+
+## Version 0.6.0
+
+- Titelerkennung je Sender prüfbar (Knopf 🎵 in der Senderliste)
+- Grundlage für das spätere Zerlegen von Aufnahmen in Einzeltitel
 
 ## Version 0.5.0
 
