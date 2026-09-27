@@ -14,7 +14,7 @@ from datetime import datetime
 
 from . import config
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _init_lock = threading.Lock()
 _initialised = False
@@ -77,6 +77,19 @@ CREATE TABLE IF NOT EXISTS recordings (
     error         TEXT,
     discovered    INTEGER NOT NULL DEFAULT 0   -- im Zielordner gefunden
 );
+
+CREATE TABLE IF NOT EXISTS track_marks (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    recording_id  TEXT    NOT NULL,
+    position_s    REAL    NOT NULL,   -- Sekunden ab Anfang der fertigen Datei
+    title         TEXT    NOT NULL,   -- Rohtext, so wie gemeldet
+    artist        TEXT,               -- daraus getrennt, falls moeglich
+    track_title   TEXT,
+    noted_at      TEXT    NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_marks_recording
+    ON track_marks(recording_id, position_s);
 
 CREATE INDEX IF NOT EXISTS idx_recordings_state   ON recordings(state);
 CREATE INDEX IF NOT EXISTS idx_recordings_started ON recordings(started_at DESC);
@@ -432,8 +445,71 @@ def list_recordings(states=None, limit=50):
 
 def delete_recording(recording_id):
     with connect() as conn:
+        conn.execute("DELETE FROM track_marks WHERE recording_id = ?",
+                     (recording_id,))
         cur = conn.execute("DELETE FROM recordings WHERE id = ?", (recording_id,))
         return cur.rowcount > 0
+
+
+# --- Titelmarken ---------------------------------------------------------
+
+def add_track_mark(recording_id, position_s, title, artist=None,
+                   track_title=None):
+    """Haelt einen gemeldeten Titelwechsel samt Position fest."""
+    with connect() as conn:
+        conn.execute(
+            """INSERT INTO track_marks
+               (recording_id, position_s, title, artist, track_title, noted_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (recording_id, float(position_s), title, artist, track_title,
+             datetime.now().isoformat(timespec="seconds")),
+        )
+
+
+def list_track_marks(recording_id):
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM track_marks WHERE recording_id = ? "
+            "ORDER BY position_s", (recording_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def last_track_mark(recording_id):
+    """Zuletzt vermerkter Titel - um Wiederholungen zu erkennen."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM track_marks WHERE recording_id = ? "
+            "ORDER BY position_s DESC, id DESC LIMIT 1",
+            (recording_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def track_marks_for(recording_ids):
+    """Alle Marken zu mehreren Aufnahmen auf einmal, nach Aufnahme sortiert.
+
+    Eine einzelne Abfrage statt einer je Aufnahme - die Bibliothek zeigt
+    bis zu zweihundert Eintraege.
+    """
+    kennungen = list(recording_ids)
+    if not kennungen:
+        return {}
+    platzhalter = ",".join("?" for _ in kennungen)
+    with connect() as conn:
+        rows = conn.execute(
+            f"SELECT * FROM track_marks WHERE recording_id IN ({platzhalter}) "
+            f"ORDER BY recording_id, position_s", kennungen).fetchall()
+    gruppen = {}
+    for row in rows:
+        gruppen.setdefault(row["recording_id"], []).append(dict(row))
+    return gruppen
+
+
+def count_track_marks(recording_id):
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM track_marks WHERE recording_id = ?",
+            (recording_id,)).fetchone()
+    return row["n"]
 
 
 def list_running():

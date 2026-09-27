@@ -77,12 +77,21 @@ def main():
     seg_time = float(arg(args, "-segment_time", "3"))
     number = int(arg(args, "-segment_start_number", "0"))
 
+    # Titelwechsel, die waehrend der "Aufnahme" gemeldet werden sollen.
+    titel = [t for t in (os.environ.get("RR_FAKE_TITEL") or "").split("|") if t]
+    abstand = float(os.environ.get("RR_FAKE_TITEL_ABSTAND", "1.0"))
+    naechster = 0
+
+    fortschritt = "-progress" in args
+
     started = time.monotonic()
     handle = None
     seg_started = 0.0
     try:
         while time.monotonic() - started < total and not _stop["flag"]:
             now = time.monotonic()
+            vergangen = now - started
+
             if handle is None or (now - seg_started) >= seg_time:
                 if handle:
                     handle.close()
@@ -91,10 +100,25 @@ def main():
                 seg_started = now
             handle.write(b"\x00" * 1024)
             handle.flush()
+
+            if fortschritt:
+                sys.stdout.write(f"out_time_us={int(vergangen * 1_000_000)}\n"
+                                 f"progress=continue\n")
+                sys.stdout.flush()
+
+            while naechster < len(titel) and vergangen >= naechster * abstand:
+                sys.stderr.write("[https @ 0x1] Metadata update for "
+                                 f"StreamTitle: {titel[naechster]}\n")
+                sys.stderr.flush()
+                naechster += 1
+
             time.sleep(0.05)
     finally:
         if handle:
             handle.close()
+        if fortschritt:
+            sys.stdout.write("progress=end\n")
+            sys.stdout.flush()
     return 255 if _stop["flag"] else 0
 
 

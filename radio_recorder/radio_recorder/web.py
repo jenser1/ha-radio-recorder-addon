@@ -294,8 +294,13 @@ def create_app():
     def recordings_page():
         eintraege = db.list_recordings(
             states=["completed", "cancelled", "failed"], limit=200)
+        marken = db.track_marks_for(e["id"] for e in eintraege)
         gesamt = 0
         for item in eintraege:
+            item["marks"] = [
+                dict(m, zeit=_format_position(m["position_s"]))
+                for m in marken.get(item["id"], [])
+            ]
             pfad = _recording_path(item, still=True)
             item["vorhanden"] = pfad is not None
             item["dateiname"] = pfad.name if pfad else ""
@@ -476,6 +481,14 @@ def _recording_path(eintrag, still=False):
                   flush=True)
         return None
     return pfad if pfad.is_file() else None
+
+
+def _format_position(sekunden):
+    """Stelle in der Aufnahme als HH:MM:SS."""
+    gesamt = max(0, int(sekunden or 0))
+    stunden, rest = divmod(gesamt, 3600)
+    minuten, sekunden = divmod(rest, 60)
+    return f"{stunden:02d}:{minuten:02d}:{sekunden:02d}"
 
 
 def _parse(value):

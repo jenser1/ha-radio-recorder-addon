@@ -26,7 +26,7 @@ from collections import deque
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import config, db, probe
+from . import config, db, metadata, probe
 
 # ffmpeg beendet sich nach SIGINT mit 255 - das ist kein Fehler.
 _SIGINT_EXIT_CODES = (0, 255)
@@ -63,6 +63,12 @@ class _Active:
         self.thread = None
         self.stderr_tail = deque(maxlen=40)
         self.lock = threading.Lock()
+        # Spielzeit des laufenden ffmpeg-Durchgangs, aus -progress gelesen.
+        self.laufzeit = 0.0
+        # Was frühere Durchgaenge bereits aufgenommen haben. Beides zusammen
+        # ergibt die Stelle in der fertigen Datei.
+        self.basis_position = 0.0
+        self.letzter_titel = None
 
 
 class Recorder:
@@ -237,6 +243,12 @@ class Recorder:
         retries = record["retry_count"]
         failure = None
 
+        # Wird hier fortgesetzt, liegen schon Segmente vor. Deren Spielzeit
+        # ist der Vorlauf, sonst laegen alle Titelmarken zu frueh.
+        active.basis_position = _aufgenommene_dauer(work_dir, ext)
+        letzte = db.last_track_mark(rid)
+        active.letzter_titel = letzte["title"] if letzte else None
+
         try:
             while True:
                 remaining = (planned_end - datetime.now()).total_seconds()
@@ -296,8 +308,13 @@ class Recorder:
         cmd = [
             *config.FFMPEG,
             "-hide_banner",
-            "-loglevel", "warning",
+            # "verbose" statt "warning": nur auf dieser Stufe meldet ffmpeg
+            # die Titelwechsel des Senders. "-nostats" haelt die Ausgabe
+            # trotzdem knapp, der Fortschritt kommt ueber -progress.
+            "-loglevel", "verbose",
+            "-nostats",
             "-nostdin",
+            "-icy", "1",
             "-reconnect", "1",
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "10",
@@ -312,13 +329,18 @@ class Recorder:
             "-segment_time", str(config.SEGMENT_MINUTES * 60),
             "-segment_start_number", str(start_number),
             "-reset_timestamps", "1",
+            # Meldet laufend die bereits aufgenommene Spielzeit. Damit laesst
+            # sich ein Titelwechsel auf die Stelle in der Datei beziehen -
+            # genauer als ueber die Uhrzeit, weil der Sender zu Beginn einen
+            # Puffer am Stueck schickt und Wiederverbindungen Luecken lassen.
+            "-progress", "pipe:1",
             "-y", pattern,
         ]
 
         try:
             proc = subprocess.Popen(
                 cmd,
-                stdout=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 errors="replace",
@@ -332,8 +354,13 @@ class Recorder:
         with active.lock:
             active.proc = proc
 
+        active.laufzeit = 0.0
+        fortschritt = threading.Thread(
+            target=_lies_fortschritt, args=(proc, active), daemon=True)
+        fortschritt.start()
+
         reader = threading.Thread(
-            target=_drain_stderr, args=(proc, active.stderr_tail), daemon=True)
+            target=_drain_stderr, args=(proc, active), daemon=True)
         reader.start()
 
         hard_stop = datetime.fromisoformat(record["planned_end"]) + timedelta(
@@ -370,8 +397,13 @@ class Recorder:
             time.sleep(0.5)
 
         reader.join(timeout=5)
+        fortschritt.join(timeout=5)
         with active.lock:
             active.proc = None
+
+        # Was dieser Durchgang aufgenommen hat, zaehlt fuer die folgenden als
+        # Vorlauf: die Segmente werden am Ende hintereinandergehaengt.
+        active.basis_position += active.laufzeit
         return proc.returncode
 
     def _signal_process(self, active):
@@ -519,15 +551,84 @@ def check_disk_space(station, minutes):
 
 # --- Hilfsfunktionen -----------------------------------------------------
 
-def _drain_stderr(proc, tail):
-    """Liest ffmpegs Fehlerausgabe mit, damit die Pipe nicht volllaeuft."""
+def _drain_stderr(proc, active):
+    """Liest ffmpegs Ausgabe mit und faengt dabei die Titelwechsel ab.
+
+    Die Pipe muss ohnehin geleert werden, sonst blockiert ffmpeg. Dieselben
+    Zeilen enthalten die ICY-Metadaten des Senders.
+    """
     try:
-        for line in proc.stderr:
-            line = line.strip()
-            if line:
-                tail.append(line)
+        for zeile in proc.stderr:
+            gestutzt = zeile.strip()
+            if gestutzt:
+                active.stderr_tail.append(gestutzt)
+            titel = metadata.titel_aus_zeile(zeile)
+            if titel:
+                _vermerke_titel(active, titel)
     except Exception:
         pass
+
+
+def _vermerke_titel(active, titel):
+    """Haelt einen Titelwechsel mit seiner Stelle in der Aufnahme fest."""
+    if titel == active.letzter_titel:
+        return              # derselbe Titel erneut gemeldet, kein Wechsel
+    active.letzter_titel = titel
+
+    position = max(0.0, active.basis_position + active.laufzeit)
+    interpret, stueck = metadata.zerlege_titel(titel)
+    try:
+        db.add_track_mark(active.id, position, titel, interpret, stueck)
+    except Exception as err:
+        print(f"[rec {active.id}] Titel nicht vermerkt: {err}", flush=True)
+        return
+    print(f"[rec {active.id}] {_format_span(position)}  {titel}", flush=True)
+
+
+def _lies_fortschritt(proc, active):
+    """Verfolgt ueber -progress, wie viel Spielzeit schon aufgenommen ist."""
+    try:
+        for zeile in proc.stdout:
+            if not zeile.startswith("out_time"):
+                continue
+            schluessel, _, wert = zeile.partition("=")
+            sekunden = _progress_sekunden(schluessel.strip(), wert.strip())
+            if sekunden is not None:
+                active.laufzeit = sekunden
+    except Exception:
+        pass
+
+
+def _progress_sekunden(schluessel, wert):
+    """Wandelt eine -progress-Zeile in Sekunden um.
+
+    ``out_time_ms`` wird bewusst uebergangen: etliche ffmpeg-Fassungen
+    liefern dort Mikrosekunden statt Millisekunden.
+    """
+    if not wert or wert == "N/A":
+        return None
+    if schluessel == "out_time_us":
+        try:
+            return int(wert) / 1_000_000
+        except ValueError:
+            return None
+    if schluessel == "out_time":
+        try:
+            stunden, minuten, rest = wert.split(":")
+            return int(stunden) * 3600 + int(minuten) * 60 + float(rest)
+        except (ValueError, AttributeError):
+            return None
+    return None
+
+
+def _aufgenommene_dauer(work_dir, ext):
+    """Spielzeit der bereits vorhandenen Segmente, fuer die Fortsetzung."""
+    gesamt = 0.0
+    for segment in _segments(work_dir, ext):
+        dauer = probe.probe_file(segment).get("duration_seconds")
+        if dauer:
+            gesamt += dauer
+    return gesamt
 
 
 def _last_error_line(tail):

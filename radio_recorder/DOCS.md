@@ -94,6 +94,21 @@ gibt keinen Papierkorb.
 Ausgeliefert wird ausschließlich, was im eingestellten Zielordner liegt.
 Zeigt ein Eintrag auf eine Datei außerhalb, wird sie nicht ausgeliefert.
 
+### Gemeldete Titel
+
+Meldet ein Sender Titelwechsel, schreibt das Add-on sie waehrend der
+Aufnahme mit. In der Bibliothek stehen sie unter **🎵 N gemeldete Titel**
+mit der Stelle, an der sie in der Datei liegen.
+
+Das ist der Rohmitschnitt: Senderkennungen, Werbung und Programmhinweise
+stehen dort ebenso drin wie die Musik. Gefiltert und geschnitten wird noch
+nicht - das kommt im naechsten Schritt, und die gesammelten Daten sind die
+Grundlage dafuer.
+
+Die Stelle wird aus ffmpegs eigener Fortschrittsmeldung bestimmt, nicht aus
+der Uhrzeit. Damit stimmt sie auch dann, wenn der Sender zu Beginn einen
+Puffer am Stueck schickt oder die Aufnahme zwischendurch unterbrochen war.
+
 ### Vorhandene Dateien aufnehmen
 
 Beim Start durchsucht das Add-on den Zielordner nach Aufnahmen, die noch
@@ -180,6 +195,8 @@ laufen Zeitpläne in UTC - dann die Zeitzone in Home Assistant prüfen
 ## Version 0.6.0
 
 - Titelerkennung je Sender prüfbar (Knopf 🎵 in der Senderliste)
+- Gemeldete Titel werden während der Aufnahme mitgeschrieben und in der
+  Bibliothek angezeigt, samt ihrer Stelle in der Datei
 - Grundlage für das spätere Zerlegen von Aufnahmen in Einzeltitel
 
 ## Version 0.5.0

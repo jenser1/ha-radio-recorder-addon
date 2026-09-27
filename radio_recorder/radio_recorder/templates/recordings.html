@@ -48,6 +48,29 @@ diesem Add-on aufgenommen">gefunden</span>
         </div>
       </td>
     </tr>
+    {% if item.marks %}
+    <tr><td colspan="6">
+      <details>
+        <summary style="cursor:pointer" class="small">
+          🎵 {{ item.marks | length }} gemeldete Titel
+        </summary>
+        <table style="margin-top:8px">
+          <tr><th style="width:90px">Stelle</th><th>Interpret</th><th>Titel</th></tr>
+          {% for m in item.marks %}
+          <tr>
+            <td class="mono">{{ m.zeit }}</td>
+            <td class="small">{{ m.artist or '—' }}</td>
+            <td class="small">{{ m.track_title or m.title }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+        <p class="small" style="margin-top:6px">
+          Roh mitgeschrieben, noch nicht gefiltert. Senderkennungen und
+          Werbung stehen hier ebenfalls drin.
+        </p>
+      </details>
+    </td></tr>
+    {% endif %}
     {% if item.error %}
     <tr><td colspan="6" class="err">⚠ {{ item.error }}</td></tr>
     {% elif item.vorhanden %}
