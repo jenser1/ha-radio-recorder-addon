@@ -41,7 +41,12 @@ Updates kommen danach wie bei jedem anderen Add-on über den Store.
 * Angefangene Aufnahmen überstehen einen Neustart des Add-ons
 * Speicherplatz wird vor dem Start geprüft und während der Aufnahme überwacht
 
-Ausführliche Beschreibung: [radio_recorder/DOCS.md](radio_recorder/DOCS.md)
+Ausführliche Beschreibung: [radio_recorder/DOCS.md](radio_recorder/DOCS.md) ·
+Änderungen: [CHANGELOG.md](radio_recorder/CHANGELOG.md)
+
+Updates laufen über die Versionsnummer in `config.yaml`: steht dort eine
+höhere als die installierte, bietet Home Assistant das Update an. Eigene
+GitHub-Releases sind dafür nicht nötig.
 
 ## Aufbau des Repositories
 
@@ -53,6 +58,7 @@ Ausführliche Beschreibung: [radio_recorder/DOCS.md](radio_recorder/DOCS.md)
 │   ├── run.sh               Startskript (bashio)
 │   ├── app.py               Einstiegspunkt
 │   ├── DOCS.md              Dokumentation im Add-on-Store
+│   ├── CHANGELOG.md         Änderungsverlauf, von HA beim Update gezeigt
 │   ├── icon.png             Symbol in der Add-on-Liste (256×256)
 │   ├── logo.png             Logo auf der Add-on-Seite
 │   └── radio_recorder/      Python-Paket
