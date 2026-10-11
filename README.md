@@ -1,9 +1,15 @@
-# Radio Recorder – Add-on für Home Assistant
+<p align="center">
+  <img src="radio_recorder/logo.png" alt="ha-radio-recorder" width="320">
+</p>
 
+<h1 align="center">Radio Recorder – Add-on für Home Assistant</h1>
+
+<p align="center">
 Zeichnet Internetradio zeitgesteuert mit FFmpeg auf – manuell oder nach
 Zeitplan, bis zu 24 Stunden am Stück.
+</p>
 
-![Version](https://img.shields.io/badge/Version-0.6.0-blue)
+![Version](https://img.shields.io/badge/Version-0.7.0-blue)
 ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-green)
 [![Erstellt mit Claude Code](https://img.shields.io/badge/Erstellt%20mit-Claude%20Code-d97757)](https://claude.com/claude-code)
 
@@ -47,6 +53,8 @@ Ausführliche Beschreibung: [radio_recorder/DOCS.md](radio_recorder/DOCS.md)
 │   ├── run.sh               Startskript (bashio)
 │   ├── app.py               Einstiegspunkt
 │   ├── DOCS.md              Dokumentation im Add-on-Store
+│   ├── icon.png             Symbol in der Add-on-Liste (256×256)
+│   ├── logo.png             Logo auf der Add-on-Seite
 │   └── radio_recorder/      Python-Paket
 ├── tests/                   Rauchtests
 └── legacy/                  Dateien einer früheren Fassung, nicht mehr aktiv

@@ -192,11 +192,15 @@ laufen Zeitpläne in UTC - dann die Zeitzone in Home Assistant prüfen
 | abgebrochen | vorzeitig gestoppt, Teilaufnahme wurde gespeichert |
 | fehlgeschlagen | keine verwertbaren Daten, Ursache wird angezeigt |
 
+## Version 0.7.0
+
+- Gemeldete Titel werden während der Aufnahme mitgeschrieben und in der
+  Bibliothek angezeigt, samt ihrer Stelle in der Datei
+- Eigenes Symbol und Logo
+
 ## Version 0.6.0
 
 - Titelerkennung je Sender prüfbar (Knopf 🎵 in der Senderliste)
-- Gemeldete Titel werden während der Aufnahme mitgeschrieben und in der
-  Bibliothek angezeigt, samt ihrer Stelle in der Datei
 - Grundlage für das spätere Zerlegen von Aufnahmen in Einzeltitel
 
 ## Version 0.5.0

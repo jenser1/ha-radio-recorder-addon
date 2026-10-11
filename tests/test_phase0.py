@@ -65,11 +65,15 @@ print("\n=== 0. Dateien sind fuer Linux brauchbar ===")
 # Windows-Zeilenenden in run.sh machen aus der Shebang "bashio\r". s6 meldet
 # dann nur "exec: fatal: unable to exec bashio" und das Add-on startet nicht.
 UEBERSPRINGEN = {".git", "legacy", "__pycache__", ".cursor"}
+# Nur Textdateien: in Bilddaten kommt die Bytefolge \r\n zufaellig vor.
+TEXTENDUNGEN = {".py", ".sh", ".yaml", ".yml", ".md", ".html", ".txt",
+                ".json", ".cfg", ".ini", ".toml", ""}
 mit_crlf = [
     pfad.relative_to(REPO).as_posix()
     for pfad in REPO.rglob("*")
     if pfad.is_file()
     and not any(teil in UEBERSPRINGEN for teil in pfad.parts)
+    and (pfad.suffix.lower() in TEXTENDUNGEN or pfad.name == "Dockerfile")
     and b"\r\n" in pfad.read_bytes()
 ]
 pruefe(not mit_crlf, "Keine Datei hat Windows-Zeilenenden",
@@ -279,6 +283,16 @@ pruefe("Europe/Berlin" in seite, "Zeitzone wird angezeigt")
 bibliothek = client.get("/recordings").get_data(as_text=True)
 pruefe("fehlgeschlagen" in bibliothek,
        "Fehlgeschlagene Aufnahme wird in der Bibliothek angezeigt")
+
+symbol = client.get("/static/icon.png")
+pruefe(symbol.status_code == 200
+       and symbol.headers.get("Content-Type") == "image/png",
+       "Symbol wird ausgeliefert",
+       f"-> {symbol.status_code} {symbol.headers.get('Content-Type')}")
+pruefe('rel="icon"' in seite, "Symbol ist als Favicon eingebunden")
+for bild in ("icon.png", "logo.png"):
+    pruefe((PROJECT / bild).is_file(),
+           f"{bild} liegt beim Add-on, damit der Store es findet")
 
 gesundheit = client.get("/health").get_json()
 pruefe(gesundheit["ok"] is True and gesundheit["timezone"] == "Europe/Berlin",

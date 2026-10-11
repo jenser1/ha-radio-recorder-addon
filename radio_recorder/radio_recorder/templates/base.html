@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Radio Recorder</title>
+<link rel="icon" type="image/png" href="{{ base }}static/icon.png">
 <style>
 :root{
   --bg:#111827; --card:#1f2937; --sunk:#0f172a; --line:#374151;
@@ -20,7 +21,8 @@ body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
 .card{background:var(--card);border-radius:14px;padding:18px;margin-bottom:16px;
   box-shadow:0 4px 16px #0004}
 h1,h2,h3{margin-top:0}
-h1{font-size:1.6rem;margin-bottom:12px}
+h1{font-size:1.6rem;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+h1 img{flex:none}
 h2{font-size:1.15rem}
 h3{font-size:1rem;color:var(--muted)}
 input,select,button{font:inherit;border-radius:9px;border:1px solid #4b5563;
@@ -67,7 +69,7 @@ footer{color:var(--muted);font-size:.82rem;text-align:center;padding:10px 0 30px
 </head>
 <body><div class="wrap">
 
-<h1>📻 Radio Recorder</h1>
+<h1><img src="{{ base }}static/icon.png" alt="" width="34" height="34">Radio Recorder</h1>
 
 <nav>
   <a href="{{ base }}" class="{{ 'aktiv' if seite == 'aufnahme' }}">Aufnahme</a>

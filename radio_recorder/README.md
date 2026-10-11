@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.png" alt="ha-radio-recorder" width="280">
+</p>
+
 # Radio Recorder
 
 Zeichnet Internetradio zeitgesteuert mit FFmpeg auf - manuell oder nach
