@@ -266,6 +266,29 @@ pruefe(db.list_track_marks(rid) == [],
        "Beim Loeschen einer Aufnahme verschwinden auch ihre Marken")
 
 
+print("\n--- Pufferstoss beim Verbinden ---")
+# Server schicken beim Verbinden einige Sekunden am Stueck. ffmpeg ist
+# dadurch frueher mit seiner Spielzeit durch als die Uhr - das darf nicht
+# als Abbruch gelten und keinen neuen Verbindungsversuch ausloesen.
+os.environ["RR_FAKE_VORLAUF"] = "55"
+rec4 = Recorder()
+begonnen = time.monotonic()
+rid3 = rec4.start(sender, duration_minutes=1, label="Pufferstoss")
+fertig = warte_auf_zustand(rid3, timeout=40)
+gebraucht = time.monotonic() - begonnen
+del os.environ["RR_FAKE_VORLAUF"]
+
+pruefe(fertig["state"] == "completed",
+       "Aufnahme gilt als regulaer beendet", f"-> {fertig['state']}")
+pruefe(fertig["retry_count"] == 0,
+       "Kein ueberfluessiger Verbindungsversuch am Ende",
+       f"-> {fertig['retry_count']} Versuche")
+pruefe(gebraucht < 30,
+       "Beendet sich, sobald die Spielzeit erreicht ist",
+       f"-> nach {gebraucht:.1f}s statt erst nach 60s")
+pruefe(not fertig["error"], "Kein Fehler vermerkt", f"-> {fertig['error']!r}")
+
+
 print("\n=== 6. Fortschrittszeilen auswerten ===")
 from radio_recorder import recorder as recorder_modul            # noqa: E402
 

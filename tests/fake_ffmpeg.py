@@ -84,13 +84,17 @@ def main():
 
     fortschritt = "-progress" in args
 
+    # Stellt den Pufferstoss beim Verbinden nach: der Server schickt sofort
+    # einige Sekunden am Stueck, dadurch ist die Spielzeit der Uhr voraus.
+    vorlauf = float(os.environ.get("RR_FAKE_VORLAUF", "0"))
+
     started = time.monotonic()
     handle = None
     seg_started = 0.0
     try:
-        while time.monotonic() - started < total and not _stop["flag"]:
+        while (time.monotonic() - started) + vorlauf < total and not _stop["flag"]:
             now = time.monotonic()
-            vergangen = now - started
+            vergangen = (now - started) + vorlauf
 
             if handle is None or (now - seg_started) >= seg_time:
                 if handle:

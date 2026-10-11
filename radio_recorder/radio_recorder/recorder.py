@@ -249,6 +249,13 @@ class Recorder:
         letzte = db.last_track_mark(rid)
         active.letzter_titel = letzte["title"] if letzte else None
 
+        # Wie viel Spielzeit am Ende in der Datei stehen soll.
+        try:
+            soll_dauer = (planned_end - datetime.fromisoformat(
+                record["started_at"])).total_seconds()
+        except (TypeError, ValueError):
+            soll_dauer = None
+
         try:
             while True:
                 remaining = (planned_end - datetime.now()).total_seconds()
@@ -267,7 +274,18 @@ class Recorder:
                     print(f"[rec {rid}] {failure}", flush=True)
                     break
                 if (planned_end - datetime.now()).total_seconds() <= 5:
-                    break   # regulaeres Ende
+                    break   # regulaeres Ende nach der Uhr
+
+                # Auch wenn die Uhr noch nicht so weit ist: steht die
+                # gewuenschte Spielzeit bereits in der Datei, ist die Aufnahme
+                # fertig. Server schicken beim Verbinden einige Sekunden am
+                # Stueck - dadurch ist ffmpeg frueher durch als die Uhr, und
+                # ohne diese Pruefung baute jede Aufnahme am Ende noch einmal
+                # ueberfluessig neu auf.
+                if soll_dauer and active.basis_position >= soll_dauer - 2:
+                    print(f"[rec {rid}] Spielzeit erreicht "
+                          f"({_format_span(active.basis_position)})", flush=True)
+                    break
 
                 # ffmpeg ist vor der Zeit ausgestiegen: Stream weg oder Fehler.
                 retries += 1

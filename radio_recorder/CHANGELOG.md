@@ -4,6 +4,14 @@ Alle nennenswerten Änderungen an diesem Add-on.
 Die Versionsnummer in `config.yaml` steuert, wann Home Assistant ein
 Update anbietet - eigene GitHub-Releases braucht es dafür nicht.
 
+## Version 0.7.1
+
+- Jede Aufnahme baute gegen Ende überflüssig neu auf: Server schicken beim
+  Verbinden einige Sekunden am Stück, dadurch ist ffmpeg mit seiner
+  Spielzeit früher durch als die Uhr. Das galt als Abbruch und löste einen
+  Verbindungsversuch mit 15 Sekunden Pause aus. Jetzt zählt die erreichte
+  Spielzeit.
+
 ## Version 0.7.0
 
 - Gemeldete Titel werden während der Aufnahme mitgeschrieben und in der
