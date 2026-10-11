@@ -48,6 +48,32 @@ Updates laufen über die Versionsnummer in `config.yaml`: steht dort eine
 höhere als die installierte, bietet Home Assistant das Update an. Eigene
 GitHub-Releases sind dafür nicht nötig.
 
+## Stand der Entwicklung
+
+Das Add-on wächst in Phasen. Was fertig ist, läuft im Alltag; was offen
+ist, steht hier, damit klar ist, worauf man sich verlassen kann.
+
+| Phase | Inhalt | Stand |
+|---|---|---|
+| **0** | Fundament: Zeitzone, SQLite, neustartsichere Aufnahmen, sichtbare Fehler, Speicherplatzprüfung | ✅ seit 0.3.0 |
+| **1** | Sender verwalten und suchen, Codec-Erkennung, Zeitpläne mit Endzeit und Vor-/Nachlauf, Bibliothek | ✅ seit 0.4.0 |
+| **2** | Speicherziele: NAS, Aufräumregeln, Cloud-Upload | ◐ NAS über HA-Netzwerkspeicher nutzbar, Regeln und Cloud offen |
+| **3** | Aufnahmen in Einzeltitel zerlegen | ◐ siehe unten |
+| **4** | Home-Assistant-Anbindung über MQTT: Sensoren, Schalter, Benachrichtigungen | ○ offen |
+| **5** | Podcast-Abos, Statistik, Programmführer | ○ offen |
+
+### Phase 3 im Einzelnen
+
+Das Zerlegen entsteht in Stufen, weil jede auf Daten aus der vorherigen
+angewiesen ist:
+
+| Stufe | Inhalt | Stand |
+|---|---|---|
+| **1** | Prüfen, ob ein Sender überhaupt Titel meldet | ✅ seit 0.6.0 |
+| **2** | Titel während der Aufnahme mitschreiben und anzeigen | ✅ seit 0.7.0 |
+| **3** | Senderkennung, Werbung und Jingles aussortieren | ○ offen, braucht Daten aus Stufe 2 |
+| **4** | Schneiden, beschriften, Titelbild | ○ offen |
+
 ## Aufbau des Repositories
 
 ```
