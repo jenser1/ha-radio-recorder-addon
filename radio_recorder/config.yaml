@@ -6,11 +6,10 @@ url: "https://github.com/jenser1/ha-radio-recorder-addon"
 arch:
   - amd64
   - aarch64
-startup: application
-boot: auto
+# startup, boot und ingress_port stehen bewusst nicht hier: application,
+# auto und 8099 sind bereits die Vorgaben des Supervisors.
 init: false
 ingress: true
-ingress_port: 8099
 panel_icon: mdi:radio
 panel_title: "Radio Recorder"
 map:
