@@ -1,7 +1,9 @@
-# Zugangsdaten - niemals ins Repo
+# Zugangsdaten und Persoenliches - niemals ins Repo
 .smbcredentials
 *.credentials
 secrets.yaml
+CLAUDE.local.md
+*.local.md
 
 # Python
 __pycache__/
