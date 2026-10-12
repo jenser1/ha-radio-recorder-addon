@@ -4,6 +4,16 @@ Alle nennenswerten Änderungen an diesem Add-on.
 Die Versionsnummer in `config.yaml` steuert, wann Home Assistant ein
 Update anbietet - eigene GitHub-Releases braucht es dafür nicht.
 
+## Version 0.7.2
+
+- Der Vorgabewert für `output_dir` lautet jetzt `/media/radio` statt eines
+  Ordners, der nach der Musiksammlung des Entwicklers benannt war.
+
+  **Bestehende Installationen sind nicht betroffen:** Home Assistant
+  speichert die eingestellten Optionen und behält sie beim Update. Nur
+  Neuinstallationen bekommen den neuen Vorgabewert. Wer den Zielordner
+  ändern möchte, tut das in den Add-on-Optionen.
+
 ## Version 0.7.1
 
 - Jede Aufnahme baute gegen Ende überflüssig neu auf: Server schicken beim

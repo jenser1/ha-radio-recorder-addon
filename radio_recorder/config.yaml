@@ -1,5 +1,5 @@
 name: "Radio Recorder"
-version: "0.7.1"
+version: "0.7.2"
 slug: "radio_recorder"
 description: "Internetradio zeitgesteuert mit FFmpeg aufzeichnen"
 url: "https://github.com/jenser1/ha-radio-recorder-addon"
@@ -16,7 +16,7 @@ map:
   - type: media
     read_only: false
 options:
-  output_dir: "/media/Musick/Radioaufnahmen"
+  output_dir: "/media/radio"
   default_duration_hours: 4
   default_duration_minutes: 0
   segment_minutes: 10

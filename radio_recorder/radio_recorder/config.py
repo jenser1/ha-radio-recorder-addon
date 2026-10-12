@@ -37,7 +37,7 @@ def _path_env(name, default):
 # --- Pfade ---------------------------------------------------------------
 
 # Zielordner fuer die fertigen Aufnahmen (Add-on-Option "output_dir").
-OUTPUT_DIR = _path_env("OUTPUT_DIR", "/media/Musick/Radioaufnahmen")
+OUTPUT_DIR = _path_env("OUTPUT_DIR", "/media/radio")
 
 # Persistenter Add-on-Speicher. Ueberlebt Updates und Neustarts.
 DATA_DIR = _path_env("DATA_DIR", "/data")

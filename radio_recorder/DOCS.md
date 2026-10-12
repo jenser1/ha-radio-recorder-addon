@@ -13,7 +13,7 @@ Datei bleibt als `jobs.json.uebernommen` liegen.
 
 | Option | Bedeutung |
 |---|---|
-| `output_dir` | Zielordner für fertige Aufnahmen. Vorgabe `/media/Musick/Radioaufnahmen`. |
+| `output_dir` | Zielordner für fertige Aufnahmen. Vorgabe `/media/radio`. Jeder Ordner unterhalb von `/media` ist möglich, auch ein eingebundener Netzwerkspeicher. |
 | `default_duration_hours` | Vorbelegung der Stunden in den Formularen. |
 | `default_duration_minutes` | Vorbelegung der Minuten. |
 | `segment_minutes` | Länge der Zwischenstücke während der Aufnahme (siehe unten). Vorgabe 10. |

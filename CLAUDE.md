@@ -13,7 +13,7 @@ Home-Assistant-Add-on, das Internetradio zeitgesteuert mit FFmpeg
 aufzeichnet. Oberfläche über Ingress, Flask, SQLite.
 
 * Repository: https://github.com/jenser1/ha-radio-recorder-addon
-* Aktuelle Fassung: **0.7.1**, Schema-Stand der Datenbank: **5**
+* Aktuelle Fassung: **0.7.2**, Schema-Stand der Datenbank: **5**
 
 ## Aufbau
 
