@@ -9,7 +9,7 @@ Zeichnet Internetradio zeitgesteuert mit FFmpeg auf – manuell oder nach
 Zeitplan, bis zu 24 Stunden am Stück.
 </p>
 
-![Version](https://img.shields.io/badge/Version-0.7.2-blue)
+![Version](https://img.shields.io/badge/Version-0.7.3-blue)
 ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-green)
 [![Erstellt mit Claude Code](https://img.shields.io/badge/Erstellt%20mit-Claude%20Code-d97757)](https://claude.com/claude-code)
 
