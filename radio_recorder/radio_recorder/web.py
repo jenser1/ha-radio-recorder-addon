@@ -1,14 +1,13 @@
 """Weboberflaeche des Add-ons (laeuft hinter dem Home-Assistant-Ingress)."""
 
 import os
-from datetime import datetime
 from pathlib import Path
 
 from flask import (Flask, abort, flash, jsonify, redirect, render_template,
                    request, send_file)
 
 from . import (__version__, config, db, directory, library, metadata, probe,
-               scheduler)
+               scheduler, zeit)
 from . import recorder as recorder_mod
 from .recorder import recorder
 
@@ -238,7 +237,7 @@ def create_app():
                 ext=befund["ext"],
                 codec=befund["codec"],
                 bitrate_kbps=_bitrate_waehlen(befund),
-                checked_at=datetime.now().isoformat(timespec="seconds"),
+                checked_at=zeit.text(zeit.jetzt()),
             )
             flash(f"{station['name']}: {befund['codec']}, "
                   f"{_bitrate_waehlen(befund)} kbit/s, .{befund['ext']}", "ok")
@@ -274,7 +273,7 @@ def create_app():
         db.update_station(
             key,
             metadata_state=zustand,
-            metadata_checked_at=datetime.now().isoformat(timespec="seconds"),
+            metadata_checked_at=zeit.text(zeit.jetzt()),
             metadata_sample="\n".join(befund["rohzeilen"][:10]) or meldung,
         )
         return redirect(_ingress_base() + "stations")
@@ -388,7 +387,7 @@ def create_app():
                 }
                 for item in recorder.active()
             ],
-            "server_time": datetime.now().strftime("%H:%M:%S"),
+            "server_time": zeit.jetzt().strftime("%H:%M:%S"),
         })
 
     @app.route("/health", methods=["GET"])
@@ -492,17 +491,16 @@ def _format_position(sekunden):
 
 
 def _parse(value):
-    try:
-        return datetime.fromisoformat(value)
-    except (TypeError, ValueError):
-        return None
+    return zeit.lese(value)
 
 
 def _span(start, end):
     first, second = _parse(start), _parse(end)
     if not first or not second:
         return "-"
-    return format_duration(int((second - first).total_seconds() // 60))
+    # Ueber zeit gerechnet, sonst stimmt die Dauer einer Aufnahme ueber die
+    # Umstellungsnacht hinweg nicht.
+    return format_duration(int(zeit.sekunden_zwischen(first, second) // 60))
 
 
 def storage_info():

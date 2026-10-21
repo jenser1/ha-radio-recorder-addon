@@ -12,6 +12,7 @@ import tempfile
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parent / "radio_recorder"      # der Add-on-Ordner
@@ -25,7 +26,8 @@ os.environ["TZ"] = "Europe/Berlin"
 
 sys.path.insert(0, str(PROJECT))
 
-from radio_recorder import config, db, directory, probe, scheduler, web  # noqa: E402
+from radio_recorder import (config, db, directory, probe, scheduler,  # noqa: E402
+                            web, zeit)
 
 config.FFMPEG = [sys.executable, str(HERE / "fake_ffmpeg.py")]
 
@@ -224,6 +226,83 @@ ergebnis = scheduler.effective_schedule(ueber_mitternacht)
 pruefe(ergebnis == (23, 56, ["sun"], 65),
        "Vorlauf ueber Mitternacht verschiebt auch den Wochentag",
        f"-> {ergebnis}")
+
+
+# --------------------------------------------------------------------------
+print("\n=== 4b. Nacht der Zeitumstellung ===")
+
+# Feste Termine, damit die Pruefung nicht vom Kalender abhaengt:
+# 29.03.2026 springt die Uhr um 02:00 auf 03:00 (die Nacht hat 23 Stunden),
+# 25.10.2026 um 03:00 zurueck auf 02:00 (25 Stunden). Beides Sonntage.
+BERLIN = ZoneInfo("Europe/Berlin")
+okt = datetime(2026, 10, 25, 1, 30, tzinfo=BERLIN)   # 01:30 MESZ
+mrz = datetime(2026, 3, 29, 1, 30, tzinfo=BERLIN)    # 01:30 MEZ
+sommer = datetime(2026, 7, 5, 1, 30, tzinfo=BERLIN)  # gewoehnliche Nacht
+
+# Zwei Stunden spaeter heisst zwei wirkliche Stunden, nicht zwei auf dem
+# Zifferblatt: Ende Oktober zeigt die Uhr dann 02:30, Ende Maerz 04:30.
+pruefe(zeit.plus_minuten(okt, 120).strftime("%H:%M %z") == "02:30 +0100",
+       "Zwei Stunden nach 01:30 MESZ ist 02:30 MEZ",
+       f"-> {zeit.plus_minuten(okt, 120).strftime('%H:%M %z')}")
+pruefe(zeit.plus_minuten(mrz, 120).strftime("%H:%M %z") == "04:30 +0200",
+       "Zwei Stunden nach 01:30 MEZ ist 04:30 MESZ",
+       f"-> {zeit.plus_minuten(mrz, 120).strftime('%H:%M %z')}")
+
+# Die doppelte Stunde: 02:30 gibt es Ende Oktober zweimal, eine Stunde
+# auseinander. Ohne den Umweg ueber UTC hielte Python beides fuer denselben
+# Zeitpunkt, weil dieselbe Zone dasselbe tzinfo-Objekt liefert.
+zweimal = [zeit.ortszeit(datetime(2026, 10, 25, 2, 30, fold=f)) for f in (0, 1)]
+pruefe(zeit.minuten_zwischen(*zweimal) == 60,
+       "02:30 MESZ und 02:30 MEZ liegen eine Stunde auseinander",
+       f"-> {zeit.minuten_zwischen(*zweimal)}")
+
+# In der fehlenden Stunde Ende Maerz gibt es 02:30 nicht. Die Uhr zeigt dann
+# 03:30 - so, wie APScheduler auch eine Startzeit in dieser Luecke behandelt.
+luecke = zeit.wandzeitpunkt(datetime(2026, 3, 29, 1, 0, tzinfo=BERLIN), 2, 30)
+pruefe(luecke.strftime("%H:%M") == "03:30",
+       "Endzeit in der fehlenden Stunde wandert nach hinten",
+       f"-> {luecke.isoformat()}")
+doppelt = zeit.wandzeitpunkt(datetime(2026, 10, 25, 1, 0, tzinfo=BERLIN), 2, 30)
+pruefe(doppelt.strftime("%H:%M %z") == "02:30 +0200",
+       "Endzeit in der doppelten Stunde meint das erste Mal",
+       f"-> {doppelt.isoformat()}")
+
+# Der eigentliche Punkt: ein Zeitplan 01:30 bis 03:30 dauert je nach Nacht
+# 60, 120 oder 180 Minuten. Fruehere Fassungen nahmen immer 120 - damit
+# fehlte Ende Oktober die letzte Stunde.
+nachtplan = {"start_time": "01:30", "end_time": "03:30",
+             "duration_minutes": 120, "weekdays": ["sun"],
+             "lead_in_minutes": 0, "lead_out_minutes": 0}
+for moment, erwartet, nacht in ((okt, 180, "Oktober"), (mrz, 60, "Maerz"),
+                                (sommer, 120, "gewoehnlich")):
+    ergebnis = scheduler.laufzeit_minuten(nachtplan, moment)
+    pruefe(ergebnis == erwartet,
+           f"01:30 bis 03:30 dauert im {nacht} {erwartet} Minuten",
+           f"-> {ergebnis}")
+
+mit_lauf = dict(nachtplan, lead_in_minutes=2, lead_out_minutes=3)
+ergebnis = scheduler.laufzeit_minuten(mit_lauf, zeit.plus_minuten(okt, -2))
+pruefe(ergebnis == 185, "Vor- und Nachlauf kommen auf die echte Dauer",
+       f"-> {ergebnis}")
+
+# Start- und Endzeit gleich bedeutet volle 24 Stunden - in der
+# Umstellungsnacht also 23 oder 25.
+ganztags = {"start_time": "20:00", "end_time": "20:00",
+            "duration_minutes": 1440, "weekdays": ["sat"],
+            "lead_in_minutes": 0, "lead_out_minutes": 0}
+for tag, erwartet in ((datetime(2026, 10, 24, 20, 0, tzinfo=BERLIN), 1500),
+                      (datetime(2026, 3, 28, 20, 0, tzinfo=BERLIN), 1380)):
+    ergebnis = scheduler.laufzeit_minuten(ganztags, tag)
+    pruefe(ergebnis == erwartet,
+           f"Ganztagsplan ab {tag:%d.%m.} dauert {erwartet} Minuten",
+           f"-> {ergebnis}")
+
+# Wer eine Dauer eingetragen hat, meint auch die Dauer: zwei Stunden
+# Aufnahme bleiben zwei Stunden, egal was die Uhr tut.
+nur_dauer = dict(nachtplan, end_time=None)
+pruefe(scheduler.laufzeit_minuten(nur_dauer, okt) == 120,
+       "Ueber die Dauer erfasster Plan bleibt unberuehrt",
+       f"-> {scheduler.laufzeit_minuten(nur_dauer, okt)}")
 
 
 # --------------------------------------------------------------------------

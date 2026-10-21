@@ -4,6 +4,28 @@ Alle nennenswerten Änderungen an diesem Add-on.
 Die Versionsnummer in `config.yaml` steuert, wann Home Assistant ein
 Update anbietet - eigene GitHub-Releases braucht es dafür nicht.
 
+## Version 0.7.3
+
+- **Zeitumstellung.** Aufnahmen über die Nacht der Umstellung hinweg waren
+  eine Stunde zu kurz. Ein Zeitplan von 01:30 bis 03:30 bedeutete immer
+  120 Minuten; Ende Oktober sind es aber 180, Ende März 60. Ende Oktober
+  fehlte dadurch die letzte Stunde, Ende März griff ein Wächter, und die
+  Aufnahme erschien in der Bibliothek als „abgebrochen", obwohl sie
+  vollständig war.
+
+  Gerechnet wird jetzt durchgehend mit Zeitpunkten samt Zeitzone. Ist ein
+  Zeitplan über die **Endzeit** erfasst, ist die Uhrzeit des Endes
+  maßgeblich — die Aufnahme läuft dann eben 60 oder 180 Minuten. Ist er
+  über die **Dauer** erfasst, bleibt die Dauer gemeint: vier Stunden
+  Aufnahme sind vier Stunden, auch wenn die Uhr dazwischen springt.
+
+- Ein Stopp zur geplanten Endzeit wird nicht mehr als Abbruch vermerkt.
+
+- Die Startzeiten waren nie betroffen: ein Zeitplan um 20:00 lief immer um
+  20:00 Ortszeit. In der Umstellungsnacht selbst wandert eine Startzeit
+  zwischen 02:00 und 02:59 Ende März um eine Stunde nach hinten, und Ende
+  Oktober wird sie nur beim ersten Durchlauf dieser Stunde ausgelöst.
+
 ## Version 0.7.2
 
 - Der Vorgabewert für `output_dir` lautet jetzt `/media/radio` statt eines

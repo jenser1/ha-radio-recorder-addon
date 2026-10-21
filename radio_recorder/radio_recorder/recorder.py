@@ -12,6 +12,11 @@ kurze Segmente im Arbeitsverzeichnis. Das hat zwei Gruende:
 Massgeblich ist dabei immer die geplante *Endzeit*, nicht die verbleibende
 Dauer. Dadurch endet eine Aufnahme auch dann zur richtigen Uhrzeit, wenn
 das Add-on zwischendurch ein paar Minuten weg war.
+
+Gerechnet wird ausschliesslich mit Zeitpunkten samt Zeitzone, siehe
+``zeit``. Eine Dauer ist damit wirkliche Zeit und nicht die Differenz auf
+dem Zifferblatt - sonst waere eine Aufnahme in der Nacht der
+Zeitumstellung eine Stunde zu kurz oder zu lang.
 """
 
 import os
@@ -23,10 +28,9 @@ import threading
 import time
 import uuid
 from collections import deque
-from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import config, db, metadata, probe
+from . import config, db, metadata, probe, zeit
 
 # ffmpeg beendet sich nach SIGINT mit 255 - das ist kein Fehler.
 _SIGINT_EXIT_CODES = (0, 255)
@@ -60,6 +64,8 @@ class _Active:
         self.stop_requested = False
         self.paused = False          # Herunterfahren: Zustand bleibt "running"
         self.notice = None           # Grund, falls von selbst gestoppt wurde
+        # Gestoppt, weil die Endzeit erreicht war - das ist kein Abbruch.
+        self.endzeit_erreicht = False
         self.thread = None
         self.stderr_tail = deque(maxlen=40)
         self.lock = threading.Lock()
@@ -87,7 +93,10 @@ class Recorder:
         if station is None:
             raise ValueError(f"Unbekannter Sender: {station_key!r}")
         duration = int(duration_minutes)
-        if duration < 1 or duration > config.MAX_DURATION_MINUTES:
+        # Die Nacht der Zeitumstellung hat 25 Stunden. Ein Zeitplan ueber die
+        # ganze Nacht liegt dann eine Stunde ueber der Obergrenze, die fuer
+        # die Eingabe gilt - er soll trotzdem laufen.
+        if duration < 1 or duration > config.MAX_DURATION_MINUTES + 60:
             raise ValueError(
                 f"Dauer muss zwischen 1 Minute und "
                 f"{config.MAX_DURATION_MINUTES // 60} Stunden liegen."
@@ -95,8 +104,10 @@ class Recorder:
 
         check_disk_space(station, duration)
 
-        started = datetime.now()
-        planned_end = started + timedelta(minutes=duration)
+        # Mit Zeitzone gerechnet: ``duration`` sind wirkliche Minuten, auch
+        # wenn die Uhr dazwischen um eine Stunde springt.
+        started = zeit.jetzt()
+        planned_end = zeit.plus_minuten(started, duration)
         rid = uuid.uuid4().hex[:8]
         work_dir = config.WORK_DIR / rid
         work_dir.mkdir(parents=True, exist_ok=True)
@@ -109,8 +120,8 @@ class Recorder:
             station_name=station["name"],
             stream_url=station["url"],
             ext=station.get("ext", "mp3"),
-            started_at=started.isoformat(timespec="seconds"),
-            planned_end=planned_end.isoformat(timespec="seconds"),
+            started_at=zeit.text(started),
+            planned_end=zeit.text(planned_end),
             work_dir=str(work_dir),
         )
 
@@ -139,15 +150,12 @@ class Recorder:
         resumed = 0
         for record in pending:
             rid = record["id"]
-            try:
-                planned_end = datetime.fromisoformat(record["planned_end"])
-            except (TypeError, ValueError):
-                planned_end = datetime.now()
+            planned_end = zeit.lese(record["planned_end"]) or zeit.jetzt()
 
             work_dir = Path(record["work_dir"] or (config.WORK_DIR / rid))
             work_dir.mkdir(parents=True, exist_ok=True)
 
-            if datetime.now() >= planned_end:
+            if zeit.sekunden_bis(planned_end) <= 0:
                 # Endzeit lag im Ausfallzeitraum - direkt abschliessen.
                 print(f"[rec {rid}] Endzeit bereits erreicht, schliesse ab",
                       flush=True)
@@ -190,17 +198,15 @@ class Recorder:
 
     def active(self):
         """Momentaufnahme aller laufenden Aufnahmen fuer die Oberflaeche."""
-        now = datetime.now()
         result = []
         with self._lock:
             actives = list(self._active.items())
 
         for rid, active in actives:
             record = active.record
-            try:
-                started = datetime.fromisoformat(record["started_at"])
-                planned_end = datetime.fromisoformat(record["planned_end"])
-            except (TypeError, ValueError):
+            started = zeit.lese(record["started_at"])
+            planned_end = zeit.lese(record["planned_end"])
+            if started is None or planned_end is None:
                 continue
             result.append({
                 "id": rid,
@@ -208,8 +214,9 @@ class Recorder:
                 "label": record["label"],
                 "started_at": started,
                 "planned_end": planned_end,
-                "elapsed": _format_span((now - started).total_seconds()),
-                "remaining": _format_span((planned_end - now).total_seconds()),
+                "elapsed": _format_span(zeit.sekunden_zwischen(started,
+                                                              zeit.jetzt())),
+                "remaining": _format_span(zeit.sekunden_bis(planned_end)),
                 "size_bytes": _work_dir_size(Path(record["work_dir"])),
                 "resume_count": record["resume_count"],
                 "retry_count": record["retry_count"],
@@ -239,7 +246,7 @@ class Recorder:
         record = active.record
         work_dir = Path(record["work_dir"])
         ext = record["ext"]
-        planned_end = datetime.fromisoformat(record["planned_end"])
+        planned_end = zeit.lese(record["planned_end"])
         retries = record["retry_count"]
         failure = None
 
@@ -249,16 +256,15 @@ class Recorder:
         letzte = db.last_track_mark(rid)
         active.letzter_titel = letzte["title"] if letzte else None
 
-        # Wie viel Spielzeit am Ende in der Datei stehen soll.
-        try:
-            soll_dauer = (planned_end - datetime.fromisoformat(
-                record["started_at"])).total_seconds()
-        except (TypeError, ValueError):
-            soll_dauer = None
+        # Wie viel Spielzeit am Ende in der Datei stehen soll. Beide
+        # Zeitpunkte tragen ihre Zone, das Ergebnis ist also wirkliche Zeit.
+        begonnen = zeit.lese(record["started_at"])
+        soll_dauer = (zeit.sekunden_zwischen(begonnen, planned_end)
+                      if begonnen else None)
 
         try:
             while True:
-                remaining = (planned_end - datetime.now()).total_seconds()
+                remaining = zeit.sekunden_bis(planned_end)
                 if remaining <= 1:
                     break
                 if active.stop_requested or active.paused:
@@ -273,7 +279,7 @@ class Recorder:
                     failure = _last_error_line(active.stderr_tail)
                     print(f"[rec {rid}] {failure}", flush=True)
                     break
-                if (planned_end - datetime.now()).total_seconds() <= 5:
+                if zeit.sekunden_bis(planned_end) <= 5:
                     break   # regulaeres Ende nach der Uhr
 
                 # Auch wenn die Uhr noch nicht so weit ist: steht die
@@ -313,8 +319,12 @@ class Recorder:
                 print(f"[rec {rid}] angehalten, wird beim naechsten Start "
                       f"fortgesetzt", flush=True)
             else:
+                # Der Waechter unten stoppt ueber dasselbe Kennzeichen wie der
+                # Benutzer. Lief die Aufnahme bis zur Endzeit, ist sie aber
+                # fertig und nicht abgebrochen.
                 self._finalize(rid, db.get_recording(rid) or record,
-                               cancelled=active.stop_requested,
+                               cancelled=(active.stop_requested
+                                          and not active.endzeit_erreicht),
                                failure=failure or active.notice)
 
     def _run_ffmpeg(self, active, work_dir, ext, remaining_seconds):
@@ -381,16 +391,17 @@ class Recorder:
             target=_drain_stderr, args=(proc, active), daemon=True)
         reader.start()
 
-        hard_stop = datetime.fromisoformat(record["planned_end"]) + timedelta(
-            seconds=_END_GRACE_SECONDS)
+        hard_stop = zeit.plus_sekunden(zeit.lese(record["planned_end"]),
+                                       _END_GRACE_SECONDS)
         naechste_platzpruefung = time.monotonic() + config.SPACE_CHECK_SECONDS
         signalled = False
 
         while proc.poll() is None:
-            if not signalled and datetime.now() >= hard_stop:
+            if not signalled and zeit.sekunden_bis(hard_stop) <= 0:
                 # Stream stockt: ffmpegs -t zaehlt Stream-Zeit, nicht Uhrzeit.
                 print(f"[rec {active.id}] Endzeit ueberschritten, stoppe",
                       flush=True)
+                active.endzeit_erreicht = True
                 active.stop_requested = True
                 self._signal_process(active)
                 signalled = True
@@ -452,7 +463,7 @@ class Recorder:
         rid = recording_id
         work_dir = Path(record["work_dir"] or (config.WORK_DIR / rid))
         ext = record["ext"]
-        ended_at = datetime.now().isoformat(timespec="seconds")
+        ended_at = zeit.text(zeit.jetzt())
         segments = _segments(work_dir, ext)
         recorded_bytes = sum(seg.stat().st_size for seg in segments)
 
@@ -677,10 +688,7 @@ def _work_dir_size(work_dir):
 
 def _output_path(record):
     """Zielpfad der fertigen Datei, bei Namensgleichheit durchnummeriert."""
-    try:
-        started = datetime.fromisoformat(record["started_at"])
-    except (TypeError, ValueError):
-        started = datetime.now()
+    started = zeit.lese(record["started_at"]) or zeit.jetzt()
 
     parts = [safe_filename(record["station_name"]) or "Radio"]
     label = safe_filename(record.get("label", ""))

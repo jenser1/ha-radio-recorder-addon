@@ -32,7 +32,7 @@ os.environ["TZ"] = "Europe/Berlin"
 
 sys.path.insert(0, str(PROJECT))
 
-from radio_recorder import config, db, scheduler, web          # noqa: E402
+from radio_recorder import config, db, scheduler, web, zeit    # noqa: E402
 from radio_recorder.recorder import Recorder                   # noqa: E402
 
 # ffmpeg durch den Platzhalter ersetzen, Segmente auf 3 Sekunden verkuerzen.
@@ -243,6 +243,19 @@ print("\n=== 6. Scheduler und Zeitzone ===")
 tz = scheduler.resolve_timezone()
 pruefe(tz is not None and "Berlin" in str(tz), "Zeitzone wird aufgeloest",
        f"-> {tz}")
+pruefe(zeit.jetzt().tzinfo is not None,
+       "Der aktuelle Zeitpunkt traegt eine Zeitzone", f"-> {zeit.jetzt()}")
+
+# Fassungen bis 0.7.2 haben Zeitstempel ohne Versatz abgelegt. Die stehen in
+# bestehenden Datenbanken und waren Ortszeit - genau so muessen sie gelesen
+# werden, sonst verschieben sich alte Aufnahmen um eine oder zwei Stunden.
+ohne_versatz = zeit.lese("2026-01-05T12:00:00")
+mit_versatz = zeit.lese("2026-01-05T12:00:00+01:00")
+pruefe(ohne_versatz is not None
+       and zeit.minuten_zwischen(ohne_versatz, mit_versatz) == 0,
+       "Zeitstempel ohne Versatz gelten als Ortszeit",
+       f"-> {ohne_versatz}")
+
 pruefe(scheduler.parse_start_time("22:05") == (22, 5), "Startzeit wird geparst")
 try:
     scheduler.parse_start_time("25:99")
@@ -350,8 +363,28 @@ spanne = (datetime.fromisoformat(lang["planned_end"])
           - datetime.fromisoformat(lang["started_at"]))
 pruefe(spanne == timedelta(hours=10), "Zehn-Stunden-Aufnahme wird angenommen",
        f"-> {spanne}")
+pruefe("+" in (lang["planned_end"] or ""),
+       "Zeitstempel tragen den Zeitzonenversatz",
+       f"-> {lang['planned_end']}")
 rec7.stop(rid6)
 warte_auf_zustand(rid6)
+
+# Die Nacht der Zeitumstellung hat 25 Stunden. Ein Zeitplan ueber die ganze
+# Nacht liegt dann eine Stunde ueber der Obergrenze fuer die Eingabe und muss
+# trotzdem laufen.
+rid_nacht = rec7.start("sunshine_live", duration_minutes=25 * 60,
+                       label="Umstellungsnacht")
+pruefe(db.get_recording(rid_nacht) is not None,
+       "Aufnahme ueber 25 Stunden wird angenommen")
+rec7.stop(rid_nacht)
+warte_auf_zustand(rid_nacht)
+try:
+    Recorder().start("sunshine_live", duration_minutes=25 * 60 + 1,
+                     label="Zu lang")
+    pruefe(False, "Mehr als 25 Stunden wird abgelehnt")
+except ValueError as err:
+    pruefe("Dauer" in str(err), "Mehr als 25 Stunden wird abgelehnt",
+           f"-> {err}")
 
 merk_frei = config.MIN_FREE_MB
 config.MIN_FREE_MB = 10 ** 9          # unerfuellbar viel verlangen
@@ -377,6 +410,33 @@ pruefe("frei" in (knapp["error"] or ""), "Grund wird vermerkt",
 pruefe(Path(knapp["output_file"] or "").exists() and knapp["size_bytes"] > 0,
        "Das bis dahin Aufgenommene bleibt erhalten",
        f"-> {knapp['size_bytes']} B")
+
+
+print("\n=== 8b. Stopp zur Endzeit ist kein Abbruch ===")
+# Stockt der Stream, erreicht ffmpegs -t die Endzeit nicht - dann greift der
+# Waechter. Frueher landete die Aufnahme deswegen als "abgebrochen" in der
+# Bibliothek, obwohl sie bis zur Endzeit gelaufen war.
+recorder_mod._END_GRACE_SECONDS = 1
+os.environ["RR_FAKE_HAENGT"] = "1"
+rid8 = "endzeit"
+wd8 = config.WORK_DIR / rid8
+wd8.mkdir(parents=True, exist_ok=True)
+db.create_recording(
+    recording_id=rid8, station_key="sunshine_live", station_name="SUNSHINE LIVE",
+    stream_url="https://example.invalid/stream", ext="mp3",
+    started_at=zeit.text(zeit.jetzt()),
+    planned_end=zeit.text(zeit.plus_sekunden(zeit.jetzt(), 3)),
+    work_dir=str(wd8), label="Endzeit")
+Recorder().resume_pending()
+zur_endzeit = warte_auf_zustand(rid8, timeout=40)
+del os.environ["RR_FAKE_HAENGT"]
+pruefe(zur_endzeit["state"] == "completed",
+       "Stopp zur Endzeit gilt als fertig, nicht als Abbruch",
+       f"-> {zur_endzeit['state']} / {zur_endzeit['error']}")
+pruefe(Path(zur_endzeit["output_file"] or "").exists()
+       and zur_endzeit["size_bytes"] > 0,
+       "Das Aufgenommene landet im Zielordner",
+       f"-> {zur_endzeit['size_bytes']} B")
 
 
 scheduler.shutdown()

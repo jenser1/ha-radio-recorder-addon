@@ -10,9 +10,8 @@ import sqlite3
 import threading
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
 
-from . import config
+from . import config, zeit
 
 SCHEMA_VERSION = 5
 
@@ -296,7 +295,7 @@ def add_station(name, url, ext="mp3", bitrate_kbps=None, codec=None,
             (key, name, url, ext, codec,
              int(bitrate_kbps or config.DEFAULT_BITRATE_KBPS),
              country, homepage, source,
-             datetime.now().isoformat(timespec="seconds")),
+             zeit.text(zeit.jetzt())),
         )
     return key
 
@@ -358,7 +357,7 @@ def add_job(name, station, start_time, duration_minutes, weekdays,
             (job_id, name, station, start_time, int(duration_minutes),
              end_time, int(lead_in_minutes), int(lead_out_minutes),
              ",".join(weekdays), 1 if enabled else 0,
-             datetime.now().isoformat(timespec="seconds")),
+             zeit.text(zeit.jetzt())),
         )
     return job_id
 
@@ -462,7 +461,7 @@ def add_track_mark(recording_id, position_s, title, artist=None,
                (recording_id, position_s, title, artist, track_title, noted_at)
                VALUES (?, ?, ?, ?, ?, ?)""",
             (recording_id, float(position_s), title, artist, track_title,
-             datetime.now().isoformat(timespec="seconds")),
+             zeit.text(zeit.jetzt())),
         )
 
 

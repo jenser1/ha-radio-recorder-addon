@@ -10,10 +10,10 @@ Fehlendes nach. Vorhandene Eintraege bleiben unangetastet.
 
 import re
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
-from . import config, db, probe
+from . import config, db, probe, zeit
 from .recorder import safe_filename
 
 # Was als Aufnahme gilt. Deckt sich mit dem, was das Add-on schreiben kann.
@@ -38,7 +38,7 @@ def scan(verzeichnis=None, mindestalter=MINDESTALTER_SEKUNDEN):
 
     bekannt = {_vergleichbar(pfad) for pfad in db.known_output_files()}
     stationen = _stationsnamen()
-    jung = datetime.now() - timedelta(seconds=mindestalter)
+    jung = zeit.plus_sekunden(zeit.jetzt(), -mindestalter)
 
     gefunden, uebersprungen = 0, 0
     for pfad in sorted(wurzel.rglob("*")):
@@ -54,7 +54,8 @@ def scan(verzeichnis=None, mindestalter=MINDESTALTER_SEKUNDEN):
         if zustand.st_size == 0:
             uebersprungen += 1
             continue
-        if datetime.fromtimestamp(zustand.st_mtime) > jung:
+        geschrieben = zeit.von_zeitstempel(zustand.st_mtime)
+        if zeit.sekunden_zwischen(jung, geschrieben) > 0:
             # Wird vielleicht gerade noch geschrieben.
             uebersprungen += 1
             continue
@@ -73,7 +74,7 @@ def _eintragen(pfad, zustand, stationen):
 
     befund = probe.probe_file(pfad)
     dauer = befund.get("duration_seconds")
-    ende = beginn + timedelta(seconds=dauer) if dauer else None
+    ende = zeit.plus_sekunden(beginn, dauer) if dauer else None
 
     kennung = "gef_" + uuid.uuid4().hex[:8]
     db.create_recording(
@@ -82,8 +83,8 @@ def _eintragen(pfad, zustand, stationen):
         station_name=sender,
         stream_url="",
         ext=pfad.suffix.lstrip(".").lower(),
-        started_at=beginn.isoformat(timespec="seconds"),
-        planned_end=(ende or beginn).isoformat(timespec="seconds"),
+        started_at=zeit.text(beginn),
+        planned_end=zeit.text(ende or beginn),
         work_dir="",
         label=bezeichnung,
         state="completed",
@@ -91,7 +92,7 @@ def _eintragen(pfad, zustand, stationen):
     )
     db.update_recording(
         kennung,
-        ended_at=(ende or beginn).isoformat(timespec="seconds"),
+        ended_at=zeit.text(ende or beginn),
         output_file=str(pfad),
         size_bytes=zustand.st_size,
         error=befund.get("fehler"),
@@ -103,13 +104,14 @@ def _aus_dateiname(pfad, zustand, stationen):
     treffer = STEMPEL.match(pfad.stem)
     if not treffer:
         # Fremde Benennung: Zeitpunkt aus der Datei, Name als Bezeichnung.
-        return (datetime.fromtimestamp(zustand.st_mtime),
+        return (zeit.von_zeitstempel(zustand.st_mtime),
                 pfad.stem.replace("_", " "), "")
 
     try:
-        beginn = datetime.strptime(treffer.group("stempel"), "%Y-%m-%d_%H-%M-%S")
+        beginn = zeit.ortszeit(datetime.strptime(
+            treffer.group("stempel"), "%Y-%m-%d_%H-%M-%S"))
     except ValueError:
-        beginn = datetime.fromtimestamp(zustand.st_mtime)
+        beginn = zeit.von_zeitstempel(zustand.st_mtime)
 
     rest = treffer.group("rest")
     for vorsilbe, name in stationen:

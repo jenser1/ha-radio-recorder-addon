@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from . import config, db
+from . import db, zeit
 from .recorder import recorder
 
 # Reihenfolge und Beschriftung der Wochentage in der Oberflaeche.
@@ -25,19 +25,12 @@ _scheduler = None
 
 
 def resolve_timezone():
-    """Ermittelt die Zeitzone aus der Umgebung, mit Rueckfallebene."""
-    name = config.TIMEZONE
-    if not name:
-        print("[scheduler] Keine Zeitzone gesetzt - verwende die des Systems. "
-              "Zeitplaene koennen dadurch verschoben sein.", flush=True)
-        return None
-    try:
-        from zoneinfo import ZoneInfo
-        return ZoneInfo(name)
-    except Exception as err:
-        print(f"[scheduler] Zeitzone {name!r} unbekannt ({err}) - "
-              f"verwende die des Systems.", flush=True)
-        return None
+    """Die Zeitzone, in der die Zeitplaene gelten.
+
+    Sie steht in ``zeit``, damit Scheduler und Recorder sich nicht
+    widersprechen koennen.
+    """
+    return zeit.zone()
 
 
 def parse_start_time(value):
@@ -102,6 +95,37 @@ def effective_schedule(job):
 
     dauer = int(job["duration_minutes"]) + vorlauf + nachlauf
     return beginn.hour, beginn.minute, weekdays, dauer
+
+
+def laufzeit_minuten(job, start):
+    """Wie lange die Aufnahme ab ``start`` wirklich laufen muss.
+
+    Die gespeicherte Dauer ist bei einem per Endzeit erfassten Zeitplan nur
+    die Differenz auf dem Zifferblatt. In der Umstellungsnacht stimmt die
+    nicht: zwischen 01:30 und 03:30 liegen Ende Maerz 60 und Ende Oktober
+    180 Minuten. Massgeblich ist dann die Uhrzeit des Endes, nicht die
+    Dauer - also wird sie hier aus der Endzeit neu gerechnet.
+
+    Wurde der Zeitplan dagegen ueber eine Dauer erfasst, ist die Dauer auch
+    gemeint: vier Stunden Aufnahme bleiben vier Stunden.
+    """
+    *_rest, nominal = effective_schedule(job)
+    ende_text = (job.get("end_time") or "").strip()
+    if not ende_text:
+        return nominal
+
+    vorlauf = max(0, int(job.get("lead_in_minutes") or 0))
+    nachlauf = max(0, int(job.get("lead_out_minutes") or 0))
+    stunde, minute = parse_start_time(ende_text)
+
+    # Gesucht ist die Endzeit nach dem *gewuenschten* Start, nicht nach dem
+    # um den Vorlauf vorgezogenen: bei einem Plan ueber 24 Stunden sind
+    # Start- und Endzeit gleich, und die erste Endzeit nach dem Vorlauf waere
+    # sonst der Start selbst.
+    start = zeit.ortszeit(start)
+    ende = zeit.wandzeitpunkt(zeit.plus_minuten(start, vorlauf), stunde, minute)
+    return max(1, zeit.minuten_zwischen(start,
+                                        zeit.plus_minuten(ende, nachlauf)))
 
 
 def start():
@@ -211,7 +235,7 @@ def _fire(job_id):
             return
 
     try:
-        _stunde, _minute, _tage, dauer = effective_schedule(job)
+        dauer = laufzeit_minuten(job, zeit.jetzt())
         recorder.start(
             station_key=job["station"],
             duration_minutes=dauer,

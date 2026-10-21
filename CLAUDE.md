@@ -13,7 +13,7 @@ Home-Assistant-Add-on, das Internetradio zeitgesteuert mit FFmpeg
 aufzeichnet. Oberfläche über Ingress, Flask, SQLite.
 
 * Repository: https://github.com/jenser1/ha-radio-recorder-addon
-* Aktuelle Fassung: **0.7.2**, Schema-Stand der Datenbank: **5**
+* Aktuelle Fassung: **0.7.3**, Schema-Stand der Datenbank: **5**
 
 ## Aufbau
 
@@ -29,6 +29,7 @@ radio_recorder/              das Add-on
     db.py        SQLite, Schema-Stand und Migration
     recorder.py  ffmpeg-Steuerung, Segmente, Platzprüfung
     scheduler.py APScheduler, Endzeit, Vor-/Nachlauf
+    zeit.py      Zeitpunkte mit Zeitzone, Umstellungsnacht
     probe.py     ffprobe: Codec, Bitrate, Spieldauer
     metadata.py  ICY-Titel auswerten
     directory.py radio-browser.info
@@ -44,12 +45,13 @@ legacy/                      alte Fassung, nicht mehr aktiv
 python tests/test_phase0.py && python tests/test_phase1.py && python tests/test_phase3.py
 ```
 
-229 Prüfungen (75 + 93 + 61). **Immer alle drei laufen lassen**, auch bei
+248 Prüfungen (82 + 105 + 61). **Immer alle drei laufen lassen**, auch bei
 kleinen Änderungen — der Recorder hängt an allem.
 
 ffmpeg und ffprobe werden durch `tests/fake_ffmpeg.py` und
 `tests/fake_ffprobe.py` ersetzt, gesteuert über Umgebungsvariablen
-(`RR_FAKE_TITEL`, `RR_FAKE_VORLAUF`, `RR_FAKE_PROBE`, `RR_FAKE_FAIL`).
+(`RR_FAKE_TITEL`, `RR_FAKE_VORLAUF`, `RR_FAKE_PROBE`, `RR_FAKE_FAIL`,
+`RR_FAKE_HAENGT`).
 Dadurch laufen die Tests ohne ffmpeg und ohne Internet, auch in der CI.
 
 Echtes ffmpeg-Verhalten lässt sich damit nicht prüfen. Alles, was daran
@@ -67,6 +69,23 @@ Ursache war `pathlib.write_text()` unter Windows: **immer**
 `open(..., newline="")` verwenden. `.gitattributes` erzwingt LF, der
 Rauchtest prüft es mit (nur Textdateien, in PNG-Daten kommt `\r\n`
 zufällig vor).
+
+**Zeitpunkte nie ohne Zeitzone und nie mit `+`/`-` vergleichen.** Alles
+Zeitliche läuft über `zeit.py`. Zwei Gründe: Eine Uhrzeit ohne Zone weiß
+nicht, wie lang „zwei Stunden später" ist — in der Umstellungsnacht ist das
+falsch (Fehler aus 0.7.2). Und Python ignoriert beim Subtrahieren und
+Vergleichen den Versatz, wenn beide Zeitpunkte **dasselbe** `tzinfo`-Objekt
+tragen; `ZoneInfo` gibt pro Zone immer dasselbe heraus. `a - b` rechnet dann
+wieder auf dem Zifferblatt, und 02:30 MESZ gilt als derselbe Zeitpunkt wie
+02:30 MEZ. Deshalb `zeit.sekunden_bis`, `zeit.sekunden_zwischen`,
+`zeit.minuten_zwischen`, `zeit.plus_minuten` verwenden — die gehen über UTC.
+Aus dem gleichen Grund normalisiert `zeit.ortszeit` über UTC:
+`astimezone` in dieselbe Zone gibt den Zeitpunkt unverändert zurück.
+
+**Dauer und Endzeit sind nicht dasselbe.** Ein über die Endzeit erfasster
+Zeitplan fragt `scheduler.laufzeit_minuten` beim Start nach der wirklichen
+Dauer; über die Dauer erfasste bleiben unberührt. Die Obergrenze im Recorder
+liegt deshalb bei 25 Stunden, die der Eingabe bei 24.
 
 **ffmpegs `-t` zählt Spielzeit, nicht Uhrzeit.** Server schicken beim
 Verbinden einige Sekunden am Stück. ffmpeg ist dadurch vor der Uhr fertig.

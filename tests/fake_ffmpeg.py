@@ -88,11 +88,17 @@ def main():
     # einige Sekunden am Stueck, dadurch ist die Spielzeit der Uhr voraus.
     vorlauf = float(os.environ.get("RR_FAKE_VORLAUF", "0"))
 
+    # Stellt einen stockenden Stream nach: -t wird nie erreicht, weil kaum
+    # Spielzeit hereinkommt. Beendet wird erst auf Signal - damit laesst sich
+    # der Waechter pruefen, der zur Endzeit eingreift.
+    haengt = bool(os.environ.get("RR_FAKE_HAENGT"))
+
     started = time.monotonic()
     handle = None
     seg_started = 0.0
     try:
-        while (time.monotonic() - started) + vorlauf < total and not _stop["flag"]:
+        while not _stop["flag"] and (
+                haengt or (time.monotonic() - started) + vorlauf < total):
             now = time.monotonic()
             vergangen = (now - started) + vorlauf
 
