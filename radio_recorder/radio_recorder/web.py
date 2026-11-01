@@ -7,7 +7,7 @@ from flask import (Flask, abort, flash, jsonify, redirect, render_template,
                    request, send_file)
 
 from . import (__version__, config, db, directory, library, metadata, probe,
-               scheduler, zeit)
+               scheduler, titelfilter, zeit)
 from . import recorder as recorder_mod
 from .recorder import recorder
 
@@ -278,6 +278,23 @@ def create_app():
         )
         return redirect(_ingress_base() + "stations")
 
+    @app.route("/stations/filters/<key>", methods=["POST"])
+    def station_filters(key):
+        """Muster pflegen, mit denen dieser Sender keine Lieder meldet."""
+        station = db.get_station(key)
+        if station is None:
+            flash("Diesen Sender gibt es nicht mehr.", "error")
+            return redirect(_ingress_base() + "stations")
+
+        muster = titelfilter.muster_aus_text(request.form.get("muster", ""))
+        db.update_station(key, title_filters=titelfilter.text_aus_muster(muster))
+        if muster:
+            flash(f"{station['name']}: {len(muster)} Muster gespeichert. "
+                  f"Sie wirken sofort auch auf schon vorhandene Aufnahmen.", "ok")
+        else:
+            flash(f"{station['name']}: Muster entfernt.", "ok")
+        return redirect(_ingress_base() + "stations")
+
     @app.route("/stations/delete/<key>", methods=["POST"])
     def delete_station(key):
         try:
@@ -294,12 +311,23 @@ def create_app():
         eintraege = db.list_recordings(
             states=["completed", "cancelled", "failed"], limit=200)
         marken = db.track_marks_for(e["id"] for e in eintraege)
+        # Die Muster haengen am Sender, nicht an der Aufnahme - einmal holen
+        # statt je Eintrag.
+        muster = {s["key"]: titelfilter.muster_aus_text(s.get("title_filters"))
+                  for s in db.list_stations()}
         gesamt = 0
         for item in eintraege:
-            item["marks"] = [
+            roh = [
                 dict(m, zeit=_format_position(m["position_s"]))
                 for m in marken.get(item["id"], [])
             ]
+            item["marks"] = titelfilter.beurteile(
+                roh,
+                sendername=item["station_name"],
+                muster=muster.get(item["station_key"]),
+                gesamtdauer=_dauer_sekunden(item))
+            item["lieder"] = titelfilter.lieder(item["marks"])
+            item["aussortiert"] = len(item["marks"]) - len(item["lieder"])
             pfad = _recording_path(item, still=True)
             item["vorhanden"] = pfad is not None
             item["dateiname"] = pfad.name if pfad else ""
@@ -309,7 +337,8 @@ def create_app():
                 gesamt += item["size_bytes"] or 0
 
         return render_template("recordings.html", seite="bibliothek",
-                               recordings=eintraege, gesamt=gesamt)
+                               recordings=eintraege, gesamt=gesamt,
+                               urteile=titelfilter.URTEIL_TEXT)
 
     @app.route("/recordings/scan", methods=["POST"])
     def scan_recordings():
@@ -492,6 +521,17 @@ def _format_position(sekunden):
 
 def _parse(value):
     return zeit.lese(value)
+
+
+def _dauer_sekunden(eintrag):
+    """Spieldauer der Aufnahme, nur fuer den Abstand der letzten Titelmarke.
+
+    Ueber zeit gerechnet, sonst stimmt es in der Umstellungsnacht nicht.
+    """
+    start, ende = _parse(eintrag.get("started_at")), _parse(eintrag.get("ended_at"))
+    if not start or not ende:
+        return None
+    return zeit.sekunden_zwischen(start, ende)
 
 
 def _span(start, end):

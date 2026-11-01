@@ -25,8 +25,9 @@ h1{font-size:1.6rem;margin-bottom:12px;display:flex;align-items:center;gap:10px}
 h1 img{flex:none}
 h2{font-size:1.15rem}
 h3{font-size:1rem;color:var(--muted)}
-input,select,button{font:inherit;border-radius:9px;border:1px solid #4b5563;
+input,select,button,textarea{font:inherit;border-radius:9px;border:1px solid #4b5563;
   padding:10px;background:var(--bg);color:#fff;width:100%}
+textarea{resize:vertical;min-height:70px}
 button{cursor:pointer;background:var(--accent);border:0;width:auto}
 button:hover{filter:brightness(1.12)}
 button.danger{background:var(--danger)}
@@ -63,6 +64,12 @@ nav a{padding:8px 15px;border-radius:9px;text-decoration:none;color:var(--muted)
 nav a.aktiv{background:var(--accent);color:#fff}
 nav a:hover{filter:brightness(1.15)}
 audio{width:100%;margin-top:8px;filter:invert(.92) hue-rotate(180deg)}
+/* Titelliste: Aussortiertes nur auf Wunsch, dann ausgegraut */
+.marken .schalter{width:auto;margin:10px 6px 0 0;vertical-align:middle}
+.marken .schalter-text{display:inline;font-size:.85rem;cursor:pointer}
+.marken tr.aussortiert{display:none}
+.marken .schalter:checked ~ table tr.aussortiert{display:table-row;opacity:.5}
+.grund{font-size:.78rem;color:var(--muted);font-style:italic}
 footer{color:var(--muted);font-size:.82rem;text-align:center;padding:10px 0 30px}
 @media(max-width:560px){ body{padding:12px} .hide-s{display:none} }
 </style>

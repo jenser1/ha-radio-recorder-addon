@@ -19,7 +19,7 @@ os.environ["OUTPUT_DIR"] = str(WORK / "out")
 os.environ["TZ"] = "Europe/Berlin"
 sys.path.insert(0, str(PROJECT))
 
-from radio_recorder import config, db, metadata, web          # noqa: E402
+from radio_recorder import config, db, metadata, web, zeit    # noqa: E402
 
 config.FFMPEG = [sys.executable, str(HERE / "fake_ffmpeg.py")]
 
@@ -256,10 +256,11 @@ os.environ["RR_FAKE_TITEL_ABSTAND"] = "1.0"
 
 print("\n--- Anzeige in der Bibliothek ---")
 seite = client.get("/recordings").get_data(as_text=True)
-pruefe("gemeldete Titel" in seite, "Titelliste erscheint in der Bibliothek")
+pruefe("Titel erkannt" in seite, "Titelliste erscheint in der Bibliothek")
 pruefe("Erster" in seite, "Die Titel stehen darin")
-pruefe("noch nicht gefiltert" in seite,
-       "Der Hinweis auf die fehlende Filterung steht dabei")
+# Im Abstand von zwei Sekunden gemeldet - das sind keine Lieder.
+pruefe("aussortiert" in seite and "zu kurz" in seite,
+       "Zu kurze Abschnitte erscheinen als aussortiert")
 
 db.delete_recording(rid)
 pruefe(db.list_track_marks(rid) == [],
@@ -309,6 +310,274 @@ for schluessel, wert, erwartet in (
         ergebnis is not None and erwartet is not None
         and abs(ergebnis - erwartet) < 0.0001)
     pruefe(passt, f"{schluessel}={wert!r} ergibt {erwartet}", f"-> {ergebnis}")
+
+
+print("\n=== 7. Titel aussortieren ===")
+from radio_recorder import titelfilter                             # noqa: E402
+
+
+def marken_aus(liste):
+    """Marken wie aus der Datenbank, aus (Position, Rohtext)."""
+    ergebnis = []
+    for position, roh in liste:
+        interpret, titel = metadata.zerlege_titel(roh)
+        ergebnis.append({"position_s": position, "title": roh,
+                         "artist": interpret, "track_title": titel})
+    return ergebnis
+
+
+def urteile(beurteilt):
+    return [m["urteil"] for m in beurteilt]
+
+
+# Die Classics-Aufnahme vom 11.10.2026, so wie sie gemeldet wurde.
+classics = marken_aus([
+    (0, "sunshine live - Classics"),
+    (20, "Terry Bones - Dreaming (DJ Kalpa Mix)"),
+    (140, "DJ Quicksilver - Ameno [2000] (Club Mix)"),
+    (588, "Veracocha - Carte Blanche (Original Mix)"),
+    (1005, "Scooter - Jump That Rock (Whatever You Want)"),
+    (1347, "Tek Room - Fox 2000 (Extended Version)"),
+])
+beurteilt = titelfilter.beurteile(classics, sendername="Sunshine-Live Classics",
+                                  gesamtdauer=1740)
+pruefe(urteile(beurteilt) == ["kennung"] + ["lied"] * 5,
+       "Classics: Senderkennung raus, fuenf Lieder bleiben",
+       f"-> {urteile(beurteilt)}")
+pruefe(len(titelfilter.lieder(beurteilt)) == 5, "lieder() liefert genau die fuenf")
+pruefe("urteil" not in classics[0],
+       "Die Rohliste bleibt unveraendert, beurteilt werden Kopien")
+pruefe(beurteilt[0]["grund"], "Aussortiertes traegt eine Begruendung",
+       f"-> {beurteilt[0]['grund']!r}")
+
+for sender, roh, erwartet, beschreibung in (
+        ("SUNSHINE LIVE", "SUNSHINE LIVE - Simulcast", "kennung",
+         "Simulcast-Kennung des Hauptstroms"),
+        ("Sunshine Live", "SUNSHINE-LIVE", "kennung",
+         "Schreibweise und Bindestrich spielen keine Rolle"),
+        ("Sunshine Live", "Live - Lightning Crashes", "lied",
+         "Die Band 'Live' bleibt ein Lied"),
+        ("Scooter Radio", "Scooter - Jump That Rock", "lied",
+         "Interpret mit Namen des Senders bleibt ein Lied"),
+        ("Sunshine Live", "Werbung", "werbung", "'Werbung' wird erkannt"),
+        ("Sunshine Live", "SUNSHINE LIVE - Werbung", "werbung",
+         "Werbung mit Sendername wird erkannt"),
+        ("Sunshine Live", "Commercial Love - Every Day", "lied",
+         "Ein Werbewort allein macht kein Lied zur Werbung"),
+        ("Sunshine Live", "Dance Department - Armin Van Buuren", "lied",
+         "Sendungsname ohne Muster ist nicht erkennbar"),
+):
+    ergebnis = titelfilter.beurteile(marken_aus([(0, roh)]), sendername=sender)
+    pruefe(urteile(ergebnis) == [erwartet], f"{beschreibung}",
+           f"-> {urteile(ergebnis)} fuer {roh!r} bei {sender!r}")
+
+ergebnis = titelfilter.beurteile(
+    marken_aus([(0, "Dance Department - Armin Van Buuren")]),
+    sendername="Sunshine Live", muster=["dance department"])
+pruefe(urteile(ergebnis) == ["sendung"],
+       "Mit Muster wird der Sendungsname erkannt, ohne Ruecksicht auf Grossschreibung",
+       f"-> {urteile(ergebnis)}")
+pruefe("Dance Department" not in ergebnis[0]["grund"]
+       and "dance department" in ergebnis[0]["grund"],
+       "Die Begruendung nennt das Muster", f"-> {ergebnis[0]['grund']!r}")
+
+# Bei Liveprogramm steht dieselbe Meldung stundenlang da.
+ergebnis = titelfilter.beurteile(marken_aus([
+    (0, "Dance Department - Armin Van Buuren"),
+    (3600, "DANCE DEPARTMENT - Armin van Buuren"),
+]), sendername="Sunshine Live")
+pruefe(urteile(ergebnis) == ["lied", "dublette"],
+       "Wiederholung derselben Meldung zaehlt nicht doppelt",
+       f"-> {urteile(ergebnis)}")
+
+print("\n--- Mindestdauer ---")
+ergebnis = titelfilter.beurteile(marken_aus([
+    (0, "A - Eins"), (59, "B - Zwei"), (119, "C - Drei"), (500, "D - Vier"),
+]), sendername="Testsender")
+pruefe(urteile(ergebnis)[:3] == ["kurz", "lied", "lied"],
+       "Unter 60 Sekunden kein Lied, genau 60 schon", f"-> {urteile(ergebnis)}")
+pruefe(urteile(ergebnis)[3] == "lied",
+       "Letzte Marke ohne bekannte Gesamtdauer bleibt verschont",
+       f"-> {urteile(ergebnis)}")
+ergebnis = titelfilter.beurteile(marken_aus([(0, "A - Eins"), (500, "D - Vier")]),
+                                 sendername="Testsender", gesamtdauer=530)
+pruefe(urteile(ergebnis) == ["lied", "kurz"],
+       "Letzte Marke zaehlt bis zum Ende der Aufnahme", f"-> {urteile(ergebnis)}")
+ergebnis = titelfilter.beurteile(marken_aus([(0, "A - Eins"), (30, "Werbung")]),
+                                 sendername="Testsender", gesamtdauer=600)
+pruefe(urteile(ergebnis) == ["kurz", "werbung"],
+       "Inhaltlicher Grund geht vor der Dauer", f"-> {urteile(ergebnis)}")
+pruefe(titelfilter.beurteile([], sendername="X") == [], "Leere Liste bleibt leer")
+
+pruefe(titelfilter.muster_aus_text("  Dance Department \r\n\n Werbung\n") ==
+       ["Dance Department", "Werbung"],
+       "Muster: eine Zeile je Eintrag, Leerzeilen fallen weg")
+
+
+print("\n=== 8. Datenbank von Stand 5 auf Stand 6 heben ===")
+import sqlite3                                                     # noqa: E402
+
+# Stand 5, so wie er bei Anwendern mit echten Zeitplaenen und Aufnahmen liegt.
+neu_db = config.DB_FILE
+alt = WORK / "data" / "stand5.db"
+verbindung = sqlite3.connect(str(alt))
+verbindung.executescript("""
+CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE stations (
+    key TEXT PRIMARY KEY, name TEXT NOT NULL, url TEXT NOT NULL,
+    ext TEXT NOT NULL DEFAULT 'mp3', codec TEXT,
+    bitrate_kbps INTEGER NOT NULL DEFAULT 192, country TEXT, homepage TEXT,
+    source TEXT NOT NULL DEFAULT 'manual', created_at TEXT NOT NULL,
+    checked_at TEXT, metadata_state TEXT, metadata_checked_at TEXT,
+    metadata_sample TEXT);
+CREATE TABLE jobs (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, station TEXT NOT NULL,
+    start_time TEXT NOT NULL, duration_minutes INTEGER NOT NULL,
+    end_time TEXT, lead_in_minutes INTEGER NOT NULL DEFAULT 0,
+    lead_out_minutes INTEGER NOT NULL DEFAULT 0, weekdays TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL);
+CREATE TABLE recordings (
+    id TEXT PRIMARY KEY, job_id TEXT, label TEXT NOT NULL DEFAULT '',
+    station_key TEXT NOT NULL, station_name TEXT NOT NULL,
+    stream_url TEXT NOT NULL, ext TEXT NOT NULL DEFAULT 'mp3',
+    state TEXT NOT NULL, started_at TEXT NOT NULL, planned_end TEXT NOT NULL,
+    ended_at TEXT, work_dir TEXT, output_file TEXT,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    resume_count INTEGER NOT NULL DEFAULT 0,
+    retry_count INTEGER NOT NULL DEFAULT 0, error TEXT,
+    discovered INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE track_marks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, recording_id TEXT NOT NULL,
+    position_s REAL NOT NULL, title TEXT NOT NULL, artist TEXT,
+    track_title TEXT, noted_at TEXT NOT NULL);
+INSERT INTO meta VALUES ('schema_version', '5');
+INSERT INTO stations (key, name, url, created_at, metadata_state) VALUES
+  ('classics', 'Sunshine-Live Classics', 'https://example.invalid/classics',
+   '2026-10-01T10:00:00+02:00', 'ok');
+INSERT INTO jobs (id, name, station, start_time, duration_minutes, weekdays,
+                  created_at) VALUES
+  ('job_alt', 'Freitag Nacht', 'classics', '22:00', 300, 'fri',
+   '2026-10-01T10:00:00+02:00');
+INSERT INTO recordings (id, station_key, station_name, stream_url, state,
+                        started_at, planned_end, ended_at) VALUES
+  ('rec_alt', 'classics', 'Sunshine-Live Classics',
+   'https://example.invalid/classics', 'completed',
+   '2026-10-11T14:13:07+02:00', '2026-10-11T14:42:07+02:00',
+   '2026-10-11T14:42:07+02:00');
+INSERT INTO track_marks (recording_id, position_s, title, artist, track_title,
+                         noted_at) VALUES
+  ('rec_alt', 0, 'sunshine live - Classics', 'sunshine live', 'Classics',
+   '2026-10-11T14:13:07+02:00'),
+  ('rec_alt', 20, 'Terry Bones - Dreaming', 'Terry Bones', 'Dreaming',
+   '2026-10-11T14:13:27+02:00');
+""")
+verbindung.commit()
+verbindung.close()
+
+config.DB_FILE = alt
+db._initialised = False
+db.init()
+
+with db.connect() as conn:
+    stand = conn.execute(
+        "SELECT value FROM meta WHERE key='schema_version'").fetchone()["value"]
+pruefe(stand == "6", "Schema-Stand ist jetzt 6", f"-> {stand}")
+sender_alt = db.get_station("classics")
+pruefe(sender_alt is not None and sender_alt["metadata_state"] == "ok",
+       "Vorhandener Sender bleibt samt Pruefergebnis erhalten", f"-> {sender_alt}")
+pruefe(sender_alt is not None and "title_filters" in sender_alt
+       and sender_alt["title_filters"] is None,
+       "Spalte fuer Muster wurde nachgezogen und ist leer")
+pruefe(len(db.list_jobs()) == 1 and db.list_jobs()[0]["name"] == "Freitag Nacht",
+       "Vorhandener Zeitplan bleibt erhalten")
+pruefe(db.get_recording("rec_alt") is not None
+       and len(db.list_track_marks("rec_alt")) == 2,
+       "Vorhandene Aufnahme samt Marken bleibt erhalten")
+seite = client.get("/recordings").get_data(as_text=True)
+pruefe("1 Titel erkannt · 1 aussortiert" in seite,
+       "Alte Marken werden ohne Nacharbeit beurteilt")
+
+db._initialised = False
+db.init()
+pruefe(len(db.list_stations()) == 1 and len(db.list_track_marks("rec_alt")) == 2,
+       "Zweiter Durchlauf veraendert nichts")
+
+config.DB_FILE = neu_db
+db._initialised = False
+db.init()
+
+
+print("\n=== 9. Muster ueber die Oberflaeche pflegen ===")
+classics_key = db.add_station(name="Sunshine-Live Classics",
+                              url="https://example.invalid/classics")
+beginn = zeit.jetzt()
+rid4 = "rec_classics"
+db.create_recording(rid4, classics_key, "Sunshine-Live Classics",
+                    "https://example.invalid/classics", "mp3",
+                    started_at=zeit.text(beginn),
+                    planned_end=zeit.text(zeit.plus_minuten(beginn, 29)),
+                    work_dir=str(WORK), label="Test 6")
+db.update_recording(rid4, state="completed",
+                    ended_at=zeit.text(zeit.plus_minuten(beginn, 29)))
+for position, roh in ((0, "sunshine live - Classics"),
+                      (20, "Terry Bones - Dreaming (DJ Kalpa Mix)"),
+                      (140, "DJ Quicksilver - Ameno [2000] (Club Mix)"),
+                      (588, "Veracocha - Carte Blanche (Original Mix)"),
+                      (1005, "Scooter - Jump That Rock (Whatever You Want)"),
+                      (1347, "Tek Room - Fox 2000 (Extended Version)"),
+                      (1500, "Dance Department - Armin Van Buuren")):
+    interpret, titel = metadata.zerlege_titel(roh)
+    db.add_track_mark(rid4, position, roh, interpret, titel)
+
+seite = client.get("/recordings").get_data(as_text=True)
+pruefe("6 Titel erkannt · 1 aussortiert" in seite,
+       "Ohne Muster: Kennung raus, Sendungsname rutscht noch durch")
+pruefe('class="aussortiert"' in seite and "Senderkennung" in seite,
+       "Aussortiertes ist markiert und begruendet")
+pruefe("Aussortiertes anzeigen" in seite, "Der Schalter ist da")
+
+client.post(f"/stations/filters/{classics_key}",
+            data={"muster": "  Dance Department \r\n\r\n"})
+pruefe(db.get_station(classics_key)["title_filters"] == "Dance Department",
+       "Muster wird bereinigt gespeichert",
+       f"-> {db.get_station(classics_key)['title_filters']!r}")
+seite = client.get("/recordings").get_data(as_text=True)
+pruefe("5 Titel erkannt · 2 aussortiert" in seite,
+       "Mit Muster faellt der Sendungsname weg - auch rueckwirkend")
+pruefe("Muster des Senders: Dance Department" in seite,
+       "Die Begruendung steht in der Liste")
+pruefe(len(db.list_track_marks(rid4)) == 7,
+       "In der Datenbank bleiben alle Rohmarken stehen")
+pruefe("Sendungsnamen aussortieren (1)" in
+       client.get("/stations").get_data(as_text=True),
+       "Die Senderliste zeigt die Zahl der Muster")
+
+client.post(f"/stations/filters/{classics_key}", data={"muster": "\n"})
+pruefe(db.get_station(classics_key)["title_filters"] == "",
+       "Leeres Feld entfernt die Muster")
+pruefe("6 Titel erkannt" in client.get("/recordings").get_data(as_text=True),
+       "Danach zaehlt der Sendungsname wieder mit")
+
+antwort = client.post("/stations/filters/gibtesnicht", data={"muster": "x"})
+pruefe(antwort.status_code in (302, 303),
+       "Unbekannter Sender fuehrt nicht zum Absturz", f"-> {antwort.status_code}")
+
+# Ohne einen einzigen Liedtitel - etwa bei Liveprogramm - gibt es einen Hinweis.
+rid5 = "rec_live"
+db.create_recording(rid5, classics_key, "Sunshine-Live Classics",
+                    "https://example.invalid/classics", "mp3",
+                    started_at=zeit.text(beginn),
+                    planned_end=zeit.text(zeit.plus_minuten(beginn, 316)),
+                    work_dir=str(WORK), label="Live")
+db.update_recording(rid5, state="completed",
+                    ended_at=zeit.text(zeit.plus_minuten(beginn, 316)))
+db.add_track_mark(rid5, 0, "SUNSHINE LIVE - Simulcast", "SUNSHINE LIVE",
+                  "Simulcast")
+db.add_track_mark(rid5, 3600, "SUNSHINE LIVE - Simulcast", "SUNSHINE LIVE",
+                  "Simulcast")
+seite = client.get("/recordings").get_data(as_text=True)
+pruefe("0 Titel erkannt · 2 aussortiert" in seite and "Kein Lied erkannt" in seite,
+       "Liveprogramm ohne Titel bekommt einen Hinweis statt einer leeren Liste")
 
 
 print("\n" + "=" * 62)

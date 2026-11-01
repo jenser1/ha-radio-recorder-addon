@@ -52,22 +52,39 @@ diesem Add-on aufgenommen">gefunden</span>
     <tr><td colspan="6">
       <details>
         <summary style="cursor:pointer" class="small">
-          🎵 {{ item.marks | length }} gemeldete Titel
+          🎵 {{ item.lieder | length }} Titel erkannt
+          {%- if item.aussortiert %} · {{ item.aussortiert }} aussortiert{% endif %}
         </summary>
-        <table style="margin-top:8px">
-          <tr><th style="width:90px">Stelle</th><th>Interpret</th><th>Titel</th></tr>
-          {% for m in item.marks %}
-          <tr>
-            <td class="mono">{{ m.zeit }}</td>
-            <td class="small">{{ m.artist or '—' }}</td>
-            <td class="small">{{ m.track_title or m.title }}</td>
-          </tr>
-          {% endfor %}
-        </table>
-        <p class="small" style="margin-top:6px">
-          Roh mitgeschrieben, noch nicht gefiltert. Senderkennungen und
-          Werbung stehen hier ebenfalls drin.
-        </p>
+        <div class="marken">
+          {% if item.aussortiert %}
+          {# Ohne Skript: der Schalter muss vor der Tabelle stehen, damit
+             der Geschwister-Selektor im CSS greift. #}
+          <input type="checkbox" class="schalter" id="alles-{{ item.id }}">
+          <label for="alles-{{ item.id }}" class="schalter-text">
+            Aussortiertes anzeigen</label>
+          {% endif %}
+          <table style="margin-top:8px">
+            <tr><th style="width:90px">Stelle</th><th>Interpret</th><th>Titel</th></tr>
+            {% for m in item.marks %}
+            <tr{% if not m.lied %} class="aussortiert"{% endif %}>
+              <td class="mono">{{ m.zeit }}</td>
+              <td class="small">{{ m.artist or '—' }}</td>
+              <td class="small">
+                {{ m.track_title or m.title }}
+                {% if not m.lied %}
+                <br><span class="grund">{{ urteile[m.urteil] }} · {{ m.grund }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
+          {% if not item.lieder %}
+          <p class="small" style="margin-top:6px">
+            Kein Lied erkannt. Die Meldungen nennen nur Sender oder Sendung —
+            bei moderiertem Liveprogramm ist das üblich.
+          </p>
+          {% endif %}
+        </div>
       </details>
     </td></tr>
     {% endif %}

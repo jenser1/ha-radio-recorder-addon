@@ -13,7 +13,7 @@ Home-Assistant-Add-on, das Internetradio zeitgesteuert mit FFmpeg
 aufzeichnet. Oberfläche über Ingress, Flask, SQLite.
 
 * Repository: https://github.com/jenser1/ha-radio-recorder-addon
-* Aktuelle Fassung: **0.7.3**, Schema-Stand der Datenbank: **5**
+* Aktuelle Fassung: **0.8.0**, Schema-Stand der Datenbank: **6**
 
 ## Aufbau
 
@@ -32,6 +32,7 @@ radio_recorder/              das Add-on
     zeit.py      Zeitpunkte mit Zeitzone, Umstellungsnacht
     probe.py     ffprobe: Codec, Bitrate, Spieldauer
     metadata.py  ICY-Titel auswerten
+    titelfilter.py  Lied, Senderkennung, Sendung, Werbung unterscheiden
     directory.py radio-browser.info
     library.py   Zielordner nach Aufnahmen durchsuchen
     web.py       Flask, alle Routen
@@ -45,7 +46,7 @@ legacy/                      alte Fassung, nicht mehr aktiv
 python tests/test_phase0.py && python tests/test_phase1.py && python tests/test_phase3.py
 ```
 
-248 Prüfungen (82 + 105 + 61). **Immer alle drei laufen lassen**, auch bei
+288 Prüfungen (82 + 105 + 101). **Immer alle drei laufen lassen**, auch bei
 kleinen Änderungen — der Recorder hängt an allem.
 
 ffmpeg und ffprobe werden durch `tests/fake_ffmpeg.py` und
@@ -139,34 +140,45 @@ Veröffentlichung. Tags werden zusätzlich gesetzt, rein für Menschen.
 | 0 | Fundament: Zeitzone, SQLite, neustartsichere Aufnahmen, Platzprüfung | fertig, im Betrieb bestätigt |
 | 1 | Sender, Codec-Erkennung, Endzeit, Vor-/Nachlauf, Bibliothek | fertig, im Betrieb bestätigt |
 | 2 | Speicherziele | NAS läuft über HA-Netzwerkspeicher; Aufräumregeln und Cloud-Upload offen |
-| 3 | Aufnahmen in Einzeltitel zerlegen | Stufen 1–2 fertig, 3–4 **blockiert**, siehe unten |
+| 3 | Aufnahmen in Einzeltitel zerlegen | Stufen 1–2 im Betrieb bestätigt, Stufe 3 fertig (0.8.0), Stufe 4 offen, siehe unten |
 | 4 | MQTT-Anbindung an Home Assistant | offen |
 | 5 | Podcasts, Statistik, Programmführer | offen |
 
-## Offener Punkt: Titelerkennung
+## Titelerkennung
 
-Phase 3 sollte Aufnahmen anhand der ICY-Metadaten in Einzeltitel zerlegen.
-Technisch funktioniert das Mitschreiben: ffmpeg meldet Titelwechsel als
+Phase 3 zerlegt Aufnahmen anhand der ICY-Metadaten in Einzeltitel. Das
+Mitschreiben funktioniert: ffmpeg meldet Titelwechsel als
 `Metadata update for StreamTitle: …`, sie werden mit ihrer Position in
 `track_marks` abgelegt und in der Bibliothek angezeigt.
 
-**Der Hauptstrom von Sunshine Live liefert aber keine Titel.** Zwei
-Testaufnahmen über je 29 Minuten ergaben zusammen vier Meldungen:
+**Ob Titel ankommen, hängt am Programm, nicht am Sender.** Im Betrieb
+bestätigt:
 
-* 3× `SUNSHINE LIVE - Simulcast` — die Senderkennung
-* 1× `Dance Department - Armin Van Buuren` — ein Sendungsname. Die
-  Aufteilung in Interpret und Titel liegt hier verkehrt herum.
+* **Automatische Playlist** — Sunshine-Live Classics, 29 Minuten, fünf
+  Lieder mit Interpret und Titel (Terry Bones, DJ Quicksilver, Veracocha,
+  Scooter, Tek Room), dazu zu Beginn einmal die Senderkennung. Die
+  Abstände von zwei bis sieben Minuten passen zu Extended Mixes.
+* **Moderiertes Liveprogramm** — der Hauptstrom (Simulcast) und auch die
+  Spartenkanäle während einer Livesendung melden nur die Senderkennung
+  oder den Sendungsnamen: `SUNSHINE LIVE - Simulcast`, oder
+  `Dance Department - Armin Van Buuren`, wo Interpret und Titel vertauscht
+  stehen. Eine Aufnahme der 90er über 5 Std. 16 Min. ergab so neun
+  Meldungen, gelaufen sind weit über hundert Lieder.
 
-Gelaufen sind in der Zeit etwa 15 Lieder, gemeldet wurde keines. Der Strom
-überträgt das UKW-Programm („Simulcast"), und solche Ströme führen meist
-keine Titelinformation. Filtern hilft nicht, wenn nichts da ist.
+Lücken von Stunden sind demnach normal und kein Fehler. Stufe 4 muss
+damit rechnen: Abschnitte ohne echte Titel bleiben ungeteilt.
 
-**Nächster Schritt:** Die Spartenkanäle prüfen (Classics, Techno, 90er,
-Eurodance, House …). Automatisierte Playlisten führen häufig sehr wohl
-Titel mit. Der Knopf 🎵 in der Senderliste beantwortet das je Sender in
-45 Sekunden. Erst wenn dort echte Liedtitel ankommen, lohnt sich Stufe 3
-(Aussortieren von Senderkennung und Werbung) und Stufe 4 (Schneiden,
-Beschriften, Titelbild).
+**Stufe 3 (Aussortieren)** steckt in `titelfilter.py` und läuft erst beim
+Anzeigen — `track_marks` bleibt roh, damit geänderte Regeln rückwirkend
+greifen. Reihenfolge der Regeln: Wiederholung, nur Sendername (plus
+`NEBENWORTE` wie „Simulcast"), Werbung, Muster des Senders
+(`stations.title_filters`, eine Zeile je Muster), unter 60 Sekunden bis
+zur nächsten Meldung. Sendungsnamen wie „Dance Department - Armin Van
+Buuren" sind nur über Muster erkennbar. Die Kennungsregel verlangt, dass
+**jedes** Wort der Meldung zum Sender gehört — sonst flöge die Band
+„Live" bei Sunshine Live mit raus.
+
+**Nächster Schritt:** Stufe 4 — Schneiden, Beschriften, Titelbild.
 
 Entschieden ist bereits: zerlegt wird erst auf Knopfdruck, die
 Originalaufnahme bleibt erhalten, Ablage in einem Ordner je Aufnahme,

@@ -111,6 +111,20 @@
             <pre class="mono" style="white-space:pre-wrap;margin:5px 0 0">{{ st.metadata_sample }}</pre>
           </details>
           {% endif %}
+          <details style="margin-top:5px">
+            <summary style="cursor:pointer">Sendungsnamen aussortieren
+              {%- if st.title_filters %} ({{ st.title_filters.splitlines() | length }}){% endif %}</summary>
+            <form method="post" action="{{ base }}stations/filters/{{ st.key }}"
+                  style="margin-top:5px">
+              <textarea name="muster" rows="3"
+                        placeholder="z. B. Dance Department">{{ st.title_filters or '' }}</textarea>
+              <div class="row" style="margin-top:5px">
+                <button class="ghost klein">Speichern</button>
+                <span>Ein Muster je Zeile. Meldungen, die es enthalten, gelten
+                  nicht als Lied.</span>
+              </div>
+            </form>
+          </details>
         </div>
       </td>
       <td>

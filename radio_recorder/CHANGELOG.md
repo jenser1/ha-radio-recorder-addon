@@ -4,6 +4,29 @@ Alle nennenswerten Änderungen an diesem Add-on.
 Die Versionsnummer in `config.yaml` steuert, wann Home Assistant ein
 Update anbietet - eigene GitHub-Releases braucht es dafür nicht.
 
+## Version 0.8.0
+
+- **Titel werden aussortiert.** Die Titelliste einer Aufnahme zeigt nur
+  noch Lieder. Senderkennungen („SUNSHINE LIVE - Simulcast"), Werbung,
+  Wiederholungen derselben Meldung und Abschnitte unter 60 Sekunden fallen
+  heraus. Ein Schalter blendet sie ausgegraut wieder ein, jeweils mit dem
+  Grund.
+
+- **Sendungsnamen je Sender.** Manche Sender melden statt des Lieds den
+  Namen der Sendung, etwa „Dance Department - Armin Van Buuren". Das ist
+  von einem Lied nicht zu unterscheiden. Unter *Sender* lassen sich dafür
+  Muster eintragen, eines je Zeile.
+
+- Aussortiert wird nur in der Anzeige. Die gemeldeten Titel bleiben
+  vollständig gespeichert, deshalb wirkt beides auch auf Aufnahmen, die
+  schon vorhanden sind.
+
+- Bei moderiertem Liveprogramm melden die Sender keine Lieder. Eine solche
+  Aufnahme zeigt jetzt einen Hinweis statt einer Liste aus Senderkennungen.
+
+- Datenbank auf Stand 6 (neue Spalte für die Muster). Zeitpläne,
+  Aufnahmen und Titel bleiben beim Update erhalten.
+
 ## Version 0.7.3
 
 - **Zeitumstellung.** Aufnahmen über die Nacht der Umstellung hinweg waren
