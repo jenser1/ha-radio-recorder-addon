@@ -9,7 +9,7 @@ Zeichnet Internetradio zeitgesteuert mit FFmpeg auf – manuell oder nach
 Zeitplan, bis zu 24 Stunden am Stück.
 </p>
 
-![Version](https://img.shields.io/badge/Version-0.8.0-blue)
+![Version](https://img.shields.io/badge/Version-0.9.0-blue)
 ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-green)
 [![Erstellt mit Claude Code](https://img.shields.io/badge/Erstellt%20mit-Claude%20Code-d97757)](https://claude.com/claude-code)
 
@@ -51,6 +51,8 @@ Updates kommen danach wie bei jedem anderen Add-on über den Store.
   Dateien im Zielordner werden von selbst aufgenommen
 * Angefangene Aufnahmen überstehen einen Neustart des Add-ons
 * Speicherplatz wird vor dem Start geprüft und während der Aufnahme überwacht
+* Auf Wunsch eine Kopie in die Cloud – WebDAV, S3 oder alles, was
+  [rclone](https://rclone.org) kann, etwa Google Drive, Dropbox, OneDrive
 
 Ausführliche Beschreibung: [radio_recorder/DOCS.md](radio_recorder/DOCS.md) ·
 Änderungen: [CHANGELOG.md](radio_recorder/CHANGELOG.md)
@@ -68,7 +70,7 @@ ist, steht hier, damit klar ist, worauf man sich verlassen kann.
 |---|---|---|
 | **0** | Fundament: Zeitzone, SQLite, neustartsichere Aufnahmen, sichtbare Fehler, Speicherplatzprüfung | ✅ seit 0.3.0 |
 | **1** | Sender verwalten und suchen, Codec-Erkennung, Zeitpläne mit Endzeit und Vor-/Nachlauf, Bibliothek | ✅ seit 0.4.0 |
-| **2** | Speicherziele: NAS, Aufräumregeln, Cloud-Upload | ◐ NAS über HA-Netzwerkspeicher nutzbar, Regeln und Cloud offen |
+| **2** | Speicherziele: NAS, Aufräumregeln, Cloud-Upload | ◐ NAS über HA-Netzwerkspeicher nutzbar, Cloud-Kopie seit 0.9.0, Aufräumregeln offen |
 | **3** | Aufnahmen in Einzeltitel zerlegen | ◐ siehe unten |
 | **4** | Home-Assistant-Anbindung über MQTT: Sensoren, Schalter, Benachrichtigungen | ○ offen |
 | **5** | Podcast-Abos, Statistik, Programmführer | ○ offen |
@@ -82,7 +84,7 @@ angewiesen ist:
 |---|---|---|
 | **1** | Prüfen, ob ein Sender überhaupt Titel meldet | ✅ seit 0.6.0 |
 | **2** | Titel während der Aufnahme mitschreiben und anzeigen | ✅ seit 0.7.0 |
-| **3** | Senderkennung, Werbung und Jingles aussortieren | ○ offen, braucht Daten aus Stufe 2 |
+| **3** | Senderkennung, Werbung und Jingles aussortieren | ✅ seit 0.8.0 |
 | **4** | Schneiden, beschriften, Titelbild | ○ offen |
 
 ## Aufbau des Repositories
@@ -91,7 +93,7 @@ angewiesen ist:
 ├── repository.yaml          Kennzeichnet das Repo als Add-on-Repository
 ├── radio_recorder/          Das Add-on selbst
 │   ├── config.yaml          Optionen und Berechtigungen
-│   ├── Dockerfile           Abbild auf Alpine-Basis mit ffmpeg
+│   ├── Dockerfile           Abbild auf Alpine-Basis mit ffmpeg und rclone
 │   ├── run.sh               Startskript (bashio)
 │   ├── app.py               Einstiegspunkt
 │   ├── DOCS.md              Dokumentation im Add-on-Store
@@ -107,11 +109,12 @@ angewiesen ist:
 ## Entwicklung
 
 ```bash
-python tests/test_phase0.py && python tests/test_phase1.py
+python tests/test_phase0.py && python tests/test_phase1.py && python tests/test_phase2.py && python tests/test_phase3.py
 ```
 
-Die Rauchtests brauchen weder ffmpeg noch Internet: ffmpeg und ffprobe werden
-durch Platzhalter in `tests/` ersetzt, die Sendersuche wird abgefangen.
+Die Rauchtests brauchen weder ffmpeg noch rclone noch Internet: alle drei
+werden durch Platzhalter in `tests/` ersetzt, die Sendersuche wird abgefangen,
+die „Cloud" ist ein Ordner.
 
 **Wichtig:** Alle Dateien müssen Unix-Zeilenenden behalten. Mit CRLF wird aus
 der ersten Zeile von `run.sh` ein `bashio\r`, und das Add-on startet nicht

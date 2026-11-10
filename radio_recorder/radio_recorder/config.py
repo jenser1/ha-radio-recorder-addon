@@ -13,6 +13,9 @@ __all__ = [
     "SEGMENT_MINUTES", "MAX_DURATION_MINUTES", "PORT", "STATIONS",
     "MAX_STREAM_RETRIES", "RETRY_BACKOFF_SECONDS", "SHUTDOWN_TIMEOUT",
     "FFMPEG", "MIN_FREE_MB", "SPACE_CHECK_SECONDS", "DEFAULT_BITRATE_KBPS",
+    "CLOUD_TYPE", "CLOUD_URL", "CLOUD_USER", "CLOUD_PASSWORD", "CLOUD_PATH",
+    "CLOUD_REMOTE", "CLOUD_CONFIG", "CLOUD_BWLIMIT_KBYTE", "CLOUD_AUTO",
+    "RCLONE",
 ]
 
 
@@ -32,6 +35,17 @@ def _int_env(name, default, minimum=None, maximum=None):
 def _path_env(name, default):
     raw = (os.environ.get(name) or "").strip()
     return Path(raw or default)
+
+
+def _text_env(name, default=""):
+    return (os.environ.get(name) or "").strip() or default
+
+
+def _bool_env(name, default=False):
+    raw = (os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in ("true", "1", "yes", "ja", "on")
 
 
 # --- Pfade ---------------------------------------------------------------
@@ -97,6 +111,43 @@ PORT = _int_env("PORT", 8099)
 # Aufrufbefehl fuer ffmpeg, als Liste. Dadurch laesst sich in Tests ein
 # Platzhalter einsetzen, ohne den Aufnahmecode anzufassen.
 FFMPEG = ["ffmpeg"]
+
+
+# --- Cloud ---------------------------------------------------------------
+# Zusaetzliche Kopie fertiger Aufnahmen ueber rclone. Der Zielordner bleibt
+# davon unberuehrt: die Aufnahme landet immer dort, die Cloud bekommt nur
+# auf Wunsch eine Kopie.
+
+# aus | webdav | s3 | rclone - die Auswahl begrenzt schon das Add-on-Schema.
+# "null" liefert bashio, wenn die Option fehlt; das heisst ebenfalls aus.
+CLOUD_TYPE = _text_env("CLOUD_TYPE", "aus").lower()
+if CLOUD_TYPE == "null":
+    CLOUD_TYPE = "aus"
+
+# webdav: Adresse, Benutzer, Passwort.
+# s3:     Endpunkt, Zugriffsschluessel, geheimer Schluessel.
+CLOUD_URL = _text_env("CLOUD_URL")
+CLOUD_USER = _text_env("CLOUD_USER")
+CLOUD_PASSWORD = os.environ.get("CLOUD_PASSWORD") or ""
+
+# Ordner in der Cloud; bei s3 beginnt er mit dem Bucket.
+CLOUD_PATH = _text_env("CLOUD_PATH").strip("/")
+
+# rclone: Name eines Remotes aus einer eigenen rclone.conf. Das ist der Weg
+# fuer Google Drive, Dropbox, OneDrive und alles, was eine Anmeldung im
+# Browser braucht - die laesst sich im Add-on nicht durchfuehren.
+CLOUD_REMOTE = _text_env("CLOUD_REMOTE").rstrip(":")
+CLOUD_CONFIG = _path_env("CLOUD_CONFIG", "/share/rclone.conf")
+
+# Obergrenze fuer den Upload in kByte/s, 0 = keine. Ein grosser Upload soll
+# nicht die ganze Leitung belegen.
+CLOUD_BWLIMIT_KBYTE = _int_env("CLOUD_BWLIMIT_KBYTE", 0, 0, 1000000)
+
+# Jede fertige Aufnahme hochladen, nicht nur die markierten Zeitplaene.
+CLOUD_AUTO = _bool_env("CLOUD_AUTO", False)
+
+# Aufrufbefehl fuer rclone - in Tests ein Platzhalter, wie bei ffmpeg.
+RCLONE = ["rclone"]
 
 
 # --- Sender --------------------------------------------------------------

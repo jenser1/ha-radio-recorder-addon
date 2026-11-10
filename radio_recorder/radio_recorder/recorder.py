@@ -498,6 +498,17 @@ class Recorder:
         print(f"[rec {rid}] Fertig: {target} ({size / 1024 / 1024:.1f} MB, "
               f"{len(segments)} Segment(e))", flush=True)
 
+        if state == "completed":
+            # Erst hier geladen: cloud braucht format_size aus diesem Modul.
+            from . import cloud
+            try:
+                cloud.nach_aufnahme(rid)
+            except Exception as err:
+                # Die Aufnahme ist fertig und liegt im Zielordner - ein
+                # Problem mit der Cloud darf daran nichts mehr aendern.
+                print(f"[rec {rid}] Cloud-Vormerkung fehlgeschlagen: {err}",
+                      flush=True)
+
 
 # --- Speicherplatz -------------------------------------------------------
 

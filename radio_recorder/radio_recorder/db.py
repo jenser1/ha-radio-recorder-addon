@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from . import config, zeit
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 _init_lock = threading.Lock()
 _initialised = False
@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     lead_out_minutes INTEGER NOT NULL DEFAULT 0,
     weekdays         TEXT    NOT NULL,   -- z.B. "mon,tue,fri"
     enabled          INTEGER NOT NULL DEFAULT 1,
-    created_at       TEXT    NOT NULL
+    created_at       TEXT    NOT NULL,
+    -- Nach jeder Aufnahme dieses Plans eine Kopie in die Cloud
+    cloud_auto       INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS recordings (
@@ -76,7 +78,12 @@ CREATE TABLE IF NOT EXISTS recordings (
     resume_count  INTEGER NOT NULL DEFAULT 0,
     retry_count   INTEGER NOT NULL DEFAULT 0,
     error         TEXT,
-    discovered    INTEGER NOT NULL DEFAULT 0   -- im Zielordner gefunden
+    discovered    INTEGER NOT NULL DEFAULT 0,  -- im Zielordner gefunden
+    -- Kopie in der Cloud: NULL = keine, queued|uploading|done|failed
+    cloud_state   TEXT,
+    cloud_target  TEXT,                  -- wohin, fuer die Anzeige
+    cloud_error   TEXT,
+    cloud_at      TEXT                   -- Zeitpunkt des letzten Versuchs
 );
 
 CREATE TABLE IF NOT EXISTS track_marks (
@@ -100,7 +107,11 @@ CREATE INDEX IF NOT EXISTS idx_recordings_started ON recordings(started_at DESC)
 _RECORDING_FIELDS = {
     "state", "ended_at", "output_file", "size_bytes",
     "resume_count", "retry_count", "error", "work_dir", "planned_end",
+    "cloud_state", "cloud_target", "cloud_error", "cloud_at",
 }
+
+# Spalten der Cloud-Kopie. Stehen einzeln, weil _upgrade sie nachzieht.
+_CLOUD_SPALTEN = ("cloud_state", "cloud_target", "cloud_error", "cloud_at")
 
 
 @contextmanager
@@ -170,14 +181,19 @@ def _upgrade(conn, vorher):
         ("end_time", "TEXT"),
         ("lead_in_minutes", "INTEGER NOT NULL DEFAULT 0"),
         ("lead_out_minutes", "INTEGER NOT NULL DEFAULT 0"),
+        ("cloud_auto", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for spalte, definition in nachzuziehen:
         if spalte not in vorhanden:
             conn.execute(f"ALTER TABLE jobs ADD COLUMN {spalte} {definition}")
 
-    if "discovered" not in _columns(conn, "recordings"):
+    vorhandene_aufnahmen = _columns(conn, "recordings")
+    if "discovered" not in vorhandene_aufnahmen:
         conn.execute("ALTER TABLE recordings ADD COLUMN discovered "
                      "INTEGER NOT NULL DEFAULT 0")
+    for spalte in _CLOUD_SPALTEN:
+        if spalte not in vorhandene_aufnahmen:
+            conn.execute(f"ALTER TABLE recordings ADD COLUMN {spalte} TEXT")
 
     vorhandene_sender = _columns(conn, "stations")
     for spalte in ("metadata_state", "metadata_checked_at", "metadata_sample",
@@ -349,19 +365,19 @@ def get_job(job_id):
 
 def add_job(name, station, start_time, duration_minutes, weekdays,
             enabled=True, job_id=None, end_time=None,
-            lead_in_minutes=0, lead_out_minutes=0):
+            lead_in_minutes=0, lead_out_minutes=0, cloud_auto=False):
     job_id = job_id or "job_" + uuid.uuid4().hex[:10]
     with connect() as conn:
         conn.execute(
             """INSERT OR REPLACE INTO jobs
                (id, name, station, start_time, duration_minutes, end_time,
                 lead_in_minutes, lead_out_minutes, weekdays, enabled,
-                created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                created_at, cloud_auto)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (job_id, name, station, start_time, int(duration_minutes),
              end_time, int(lead_in_minutes), int(lead_out_minutes),
              ",".join(weekdays), 1 if enabled else 0,
-             zeit.text(zeit.jetzt())),
+             zeit.text(zeit.jetzt()), 1 if cloud_auto else 0),
         )
     return job_id
 
@@ -378,10 +394,17 @@ def set_job_enabled(job_id, enabled):
                      (1 if enabled else 0, job_id))
 
 
+def set_job_cloud_auto(job_id, an):
+    with connect() as conn:
+        conn.execute("UPDATE jobs SET cloud_auto = ? WHERE id = ?",
+                     (1 if an else 0, job_id))
+
+
 def _job_from_row(row):
     job = dict(row)
     job["weekdays"] = [d for d in (job.get("weekdays") or "").split(",") if d]
     job["enabled"] = bool(job["enabled"])
+    job["cloud_auto"] = bool(job.get("cloud_auto"))
     return job
 
 
@@ -513,6 +536,28 @@ def count_track_marks(recording_id):
             "SELECT COUNT(*) AS n FROM track_marks WHERE recording_id = ?",
             (recording_id,)).fetchone()
     return row["n"]
+
+
+def cloud_warteschlange():
+    """Aufnahmen, die auf ihren Upload warten - die aelteste zuerst."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM recordings WHERE cloud_state = 'queued' "
+            "ORDER BY cloud_at, started_at").fetchall()
+    return [dict(r) for r in rows]
+
+
+def cloud_unterbrochene_freigeben():
+    """Setzt Uploads, die beim Beenden noch liefen, zurueck in die Warteschlange.
+
+    Ein Upload, der mitten im Senden abgebrochen wurde, hat in der Cloud
+    hoechstens eine halbe Datei hinterlassen. rclone ueberschreibt sie beim
+    naechsten Versuch.
+    """
+    with connect() as conn:
+        cur = conn.execute("UPDATE recordings SET cloud_state = 'queued' "
+                           "WHERE cloud_state = 'uploading'")
+        return cur.rowcount
 
 
 def list_running():

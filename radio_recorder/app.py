@@ -4,7 +4,8 @@ Ablauf beim Start:
  1. Datenbank anlegen bzw. oeffnen (uebernimmt einmalig alte jobs.json)
  2. Aufnahmen fortsetzen, die beim letzten Beenden noch liefen
  3. Zeitplaene in den Scheduler eintragen
- 4. Weboberflaeche starten
+ 4. Cloud-Uploads aufnehmen, auch unterbrochene
+ 5. Weboberflaeche starten
 """
 
 import os
@@ -13,7 +14,7 @@ import sys
 
 import threading
 
-from radio_recorder import __version__, config, db, library, scheduler, web
+from radio_recorder import __version__, cloud, config, db, library, scheduler, web
 from radio_recorder.recorder import recorder
 
 
@@ -34,6 +35,7 @@ def _install_signal_handlers():
     def _handler(signum, _frame):
         print(f"[start] Signal {signum} empfangen - fahre herunter", flush=True)
         scheduler.shutdown()
+        cloud.shutdown()
         recorder.shutdown()
         # Der Webserver blockiert im Hauptthread; hier hilft nur der harte Weg.
         os._exit(0)
@@ -65,6 +67,7 @@ def main():
         print(f"[start] {resumed} Aufnahme(n) fortgesetzt", flush=True)
 
     scheduler.start()
+    cloud.start()
 
     # Der Suchlauf liest jede noch unbekannte Datei einmal mit ffprobe an.
     # Beim ersten Mal kann das dauern, deshalb laeuft er nebenher - die

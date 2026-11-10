@@ -1,6 +1,6 @@
 FROM ghcr.io/home-assistant/base:latest
 
-RUN apk add --no-cache ffmpeg python3 py3-pip tzdata
+RUN apk add --no-cache ffmpeg python3 py3-pip tzdata rclone
 
 WORKDIR /app
 COPY requirements.txt /app/requirements.txt

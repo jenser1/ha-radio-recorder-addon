@@ -4,6 +4,27 @@ Alle nennenswerten Änderungen an diesem Add-on.
 Die Versionsnummer in `config.yaml` steuert, wann Home Assistant ein
 Update anbietet - eigene GitHub-Releases braucht es dafür nicht.
 
+## Version 0.9.0
+
+- **Kopie in die Cloud.** Fertige Aufnahmen lassen sich zusätzlich in eine
+  Cloud kopieren - über WebDAV (Nextcloud und viele andere), S3 (Backblaze,
+  Wasabi, Hetzner und andere) oder eine eigene rclone-Konfiguration für
+  Google Drive, Dropbox und OneDrive. Der Zielordner bleibt unverändert, die
+  Cloud bekommt nur eine Kopie. Eingerichtet wird in den Add-on-Optionen
+  unter `cloud_type`; ohne Einrichtung ändert sich nichts.
+
+- Hochgeladen wird auf Knopfdruck aus der Bibliothek, je Zeitplan nach
+  jeder Aufnahme oder mit `cloud_auto` immer. Der Upload läuft im
+  Hintergrund, wird bei Fehlern wiederholt und übersteht einen Neustart.
+  Den Stand zeigt die Bibliothek an jeder Aufnahme.
+
+- Das Add-on bindet jetzt zusätzlich `/share` ein, nur lesend - dort darf
+  eine eigene `rclone.conf` liegen.
+
+- Datenbank auf Stand 7 (neue Spalten für Zeitpläne und Aufnahmen).
+  Zeitpläne, Aufnahmen und Titel bleiben beim Update erhalten; kein
+  vorhandener Zeitplan lädt von sich aus hoch.
+
 ## Version 0.8.0
 
 - **Titel werden aussortiert.** Die Titelliste einer Aufnahme zeigt nur

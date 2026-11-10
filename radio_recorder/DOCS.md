@@ -19,6 +19,15 @@ Datei bleibt als `jobs.json.uebernommen` liegen.
 | `segment_minutes` | Länge der Zwischenstücke während der Aufnahme (siehe unten). Vorgabe 10. |
 | `min_free_mb` | So viel Platz soll frei bleiben. Wird vor dem Start geprüft und während der Aufnahme überwacht. Vorgabe 500. |
 | `work_dir` | Optional. Ablage der Zwischenstücke. Ohne Angabe `/data/work`. |
+| `cloud_type` | Kopie in die Cloud: `aus` (Vorgabe), `webdav`, `s3` oder `rclone`. Siehe [Kopie in die Cloud](#kopie-in-die-cloud). |
+| `cloud_url` | WebDAV-Adresse bzw. S3-Endpunkt. |
+| `cloud_user` | WebDAV-Benutzer bzw. S3-Zugriffsschlüssel. |
+| `cloud_password` | WebDAV-Passwort bzw. geheimer S3-Schlüssel. Wird in der Oberfläche verdeckt angezeigt. |
+| `cloud_path` | Ordner in der Cloud. Bei S3 beginnt er mit dem Bucket, etwa `radio/aufnahmen`. |
+| `cloud_remote` | Nur bei `rclone`: Name des Remotes aus der eigenen `rclone.conf`. |
+| `cloud_config` | Nur bei `rclone`: Pfad zur `rclone.conf`. Vorgabe `/share/rclone.conf`. |
+| `cloud_bwlimit_kbyte` | Obergrenze für den Upload in kByte/s. Ohne Angabe ungedrosselt. |
+| `cloud_auto` | Jede fertige Aufnahme kopieren, nicht nur die markierten Zeitpläne. Vorgabe aus. |
 
 ## Sender
 
@@ -129,6 +138,106 @@ geschrieben wurden - die könnten noch unfertig sein.
 
 Der erste Suchlauf liest jede Datei einmal an und kann bei vielen Aufnahmen
 etwas dauern. Er läuft nebenher, die Oberfläche ist sofort bedienbar.
+
+## Kopie in die Cloud
+
+Auf Wunsch kommt eine fertige Aufnahme zusätzlich in eine Cloud. Der
+Zielordner bleibt davon unberührt: die Aufnahme landet immer dort, die
+Cloud bekommt nur eine Kopie. Ist `cloud_type` auf `aus`, ändert sich am
+Add-on nichts.
+
+Hochgeladen wird mit [rclone](https://rclone.org). Drei Wege:
+
+**WebDAV** - Nextcloud, ownCloud und die meisten Cloud-Speicher von
+Providern und NAS-Herstellern. Die WebDAV-Adresse steht beim Anbieter in den
+Einstellungen; bei Nextcloud lautet sie
+`https://<server>/remote.php/dav/files/<benutzer>`. Wo es geht, ein eigenes
+App-Passwort anlegen statt des Hauptpassworts.
+
+```yaml
+cloud_type: webdav
+cloud_url: https://cloud.example.de/remote.php/dav/files/anna
+cloud_user: anna
+cloud_password: app-passwort
+cloud_path: Radioaufnahmen
+```
+
+**S3** - Backblaze B2, Wasabi, Hetzner Object Storage, MinIO, Amazon S3 und
+alles, was die S3-Schnittstelle spricht. Der Endpunkt steht beim Anbieter,
+bei Backblaze etwa `https://s3.<region>.backblazeb2.com`.
+
+```yaml
+cloud_type: s3
+cloud_url: https://s3.eu-central-003.backblazeb2.com
+cloud_user: <Zugriffsschlüssel>
+cloud_password: <geheimer Schlüssel>
+cloud_path: mein-bucket/radio
+```
+
+**Eigene rclone-Konfiguration** - für Google Drive, Dropbox, OneDrive,
+pCloud und alles, wofür eine Anmeldung im Browser nötig ist. Die lässt
+sich im Add-on nicht durchführen. Stattdessen:
+
+1. rclone auf dem eigenen Rechner installieren und `rclone config`
+   aufrufen. Ein neues Remote anlegen, etwa namens `gdrive`; dabei öffnet
+   sich der Browser für die Anmeldung.
+2. `rclone config file` zeigt, wo die fertige `rclone.conf` liegt. Diese
+   Datei nach `/share/rclone.conf` kopieren, zum Beispiel über das Add-on
+   *Samba share*.
+3. In den Optionen eintragen:
+
+```yaml
+cloud_type: rclone
+cloud_remote: gdrive
+cloud_path: Radioaufnahmen
+```
+
+Unter **Aufnahme → Speicher** steht danach das Ziel. Fehlt eine Angabe,
+steht dort, welche.
+
+### Wann hochgeladen wird
+
+* **Auf Knopfdruck:** ☁ in der Bibliothek, für jede einzelne Aufnahme.
+* **Je Zeitplan:** Beim Anlegen eines Zeitplans den Haken *Nach der
+  Aufnahme eine Kopie in die Cloud* setzen, oder bei einem bestehenden
+  Zeitplan auf ☁ tippen. Ein blau umrandetes ☁ heißt: eingeschaltet.
+* **Immer:** Mit `cloud_auto: true` wird jede fertige Aufnahme kopiert.
+
+Automatisch kommen nur Aufnahmen in die Cloud, die regulär zu Ende gelaufen
+sind. Eine von Hand gestoppte Aufnahme lässt sich über ☁ trotzdem
+hochladen.
+
+### Was beim Hochladen passiert
+
+Der Upload läuft im Hintergrund, eine Aufnahme nach der anderen. Eine
+laufende oder die nächste geplante Aufnahme wartet nie darauf. Der Stand
+steht in der Bibliothek an jeder Aufnahme:
+
+| Kennzeichnung | Bedeutung |
+|---|---|
+| ☁ wartet | steht zum Hochladen an |
+| ☁ laedt hoch | wird gerade übertragen |
+| ☁ in der Cloud | erfolgreich kopiert |
+| ☁ Fehler | gescheitert, der Grund steht darunter; ☁ versucht es erneut |
+
+Scheitert ein Upload, wird er nach einer Minute wiederholt, insgesamt
+dreimal. Wird das Add-on währenddessen beendet, geht es nach dem Neustart
+weiter. Während eine Aufnahme übertragen wird, lässt sie sich nicht
+löschen.
+
+Bei 192 kbit/s sind das rund 86 MB je Stunde Aufnahme. Bei kostenlosen
+Tarifen mit wenigen Gigabyte ist der Platz damit schnell erschöpft; mit
+`cloud_bwlimit_kbyte` lässt sich verhindern, dass ein Upload die ganze
+Leitung belegt.
+
+### Zugangsdaten
+
+Das Passwort steht in den Add-on-Optionen und wird dort verdeckt
+angezeigt. Gespeichert ist es, wie alle Optionen, von Home Assistant im
+Klartext unter `/data/options.json` im Add-on. Für WebDAV legt das Add-on
+daraus `/data/rclone-cloud.conf` an; rclone verschleiert das Passwort
+darin, verschlüsselt ist es aber nicht. Deshalb besser ein eigenes
+App-Passwort oder einen Schlüssel nur für diesen Zweck verwenden.
 
 ## Wie eine Aufnahme abläuft
 

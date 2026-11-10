@@ -414,7 +414,7 @@ pruefe(titelfilter.muster_aus_text("  Dance Department \r\n\n Werbung\n") ==
        "Muster: eine Zeile je Eintrag, Leerzeilen fallen weg")
 
 
-print("\n=== 8. Datenbank von Stand 5 auf Stand 6 heben ===")
+print("\n=== 8. Datenbank von Stand 5 auf den aktuellen Stand heben ===")
 import sqlite3                                                     # noqa: E402
 
 # Stand 5, so wie er bei Anwendern mit echten Zeitplaenen und Aufnahmen liegt.
@@ -481,7 +481,8 @@ db.init()
 with db.connect() as conn:
     stand = conn.execute(
         "SELECT value FROM meta WHERE key='schema_version'").fetchone()["value"]
-pruefe(stand == "6", "Schema-Stand ist jetzt 6", f"-> {stand}")
+pruefe(stand == str(db.SCHEMA_VERSION),
+       f"Schema-Stand ist jetzt {db.SCHEMA_VERSION}", f"-> {stand}")
 sender_alt = db.get_station("classics")
 pruefe(sender_alt is not None and sender_alt["metadata_state"] == "ok",
        "Vorhandener Sender bleibt samt Pruefergebnis erhalten", f"-> {sender_alt}")

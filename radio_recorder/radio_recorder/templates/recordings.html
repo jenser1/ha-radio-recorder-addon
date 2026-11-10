@@ -26,6 +26,10 @@ die noch nicht in der Liste stehen">🔎 Zielordner durchsuchen</button>
         <br><span class="badge grau" title="Im Zielordner gefunden, nicht von
 diesem Add-on aufgenommen">gefunden</span>
         {% endif %}
+        {% if item.cloud_text %}
+        <br><span class="badge cloud-{{ item.cloud_state }}"
+              title="Cloud-Kopie: {{ item.cloud_target or '' }}">☁ {{ item.cloud_text }}</span>
+        {% endif %}
       </td>
       <td>
         {{ item.station_name }}
@@ -40,6 +44,13 @@ diesem Add-on aufgenommen">gefunden</span>
           <a href="{{ base }}recordings/download/{{ item.id }}">
             <button class="ghost klein" type="button" title="Herunterladen">⬇</button>
           </a>
+          {% endif %}
+          {% if cloud.bereit and item.vorhanden
+                and item.cloud_state not in ('queued', 'uploading') %}
+          <form method="post" action="{{ base }}recordings/cloud/{{ item.id }}">
+            <button class="ghost klein"
+                    title="{% if item.cloud_state %}Erneut in{% else %}In{% endif %} die Cloud kopieren: {{ cloud.ziel }}">☁</button>
+          </form>
           {% endif %}
           <form method="post" action="{{ base }}recordings/delete/{{ item.id }}"
                 onsubmit="return confirm('Aufnahme endgültig löschen?\n\n{{ item.dateiname }}')">
@@ -87,6 +98,9 @@ diesem Add-on aufgenommen">gefunden</span>
         </div>
       </details>
     </td></tr>
+    {% endif %}
+    {% if item.cloud_state == 'failed' and item.cloud_error %}
+    <tr><td colspan="6" class="err">☁ Upload fehlgeschlagen: {{ item.cloud_error }}</td></tr>
     {% endif %}
     {% if item.error %}
     <tr><td colspan="6" class="err">⚠ {{ item.error }}</td></tr>

@@ -134,6 +134,15 @@
       <label><input type="checkbox" name="weekday" value="{{ key }}">{{ label }}</label>
       {% endfor %}
     </p>
+    {% if cloud.eingeschaltet %}
+    <p class="weekdays">
+      <label><input type="checkbox" name="cloud_auto" value="1"
+        {% if cloud.auto %}checked disabled{% endif %}>
+        ☁ Nach der Aufnahme eine Kopie in die Cloud</label>
+      {% if cloud.auto %}<span class="small">— geschieht ohnehin bei jeder
+        Aufnahme (Option cloud_auto)</span>{% endif %}
+    </p>
+    {% endif %}
     <button type="submit">➕ Zeitplan speichern</button>
   </form>
   {% else %}
@@ -152,7 +161,8 @@
     {% for job in jobs %}
     <tr {% if not job.enabled %}style="opacity:.5"{% endif %}>
       <td>
-        {{ job.name }}<br>
+        {{ job.name }}{% if cloud.eingeschaltet and (job.cloud_auto or cloud.auto) %}
+        <span title="Aufnahmen werden in die Cloud kopiert">☁</span>{% endif %}<br>
         <span class="small">{{ job.station_name }}</span>
       </td>
       <td>
@@ -167,6 +177,13 @@
           <form method="post" action="{{ base }}schedule/toggle/{{ job.id }}">
             <button class="ghost klein">{% if job.enabled %}⏸{% else %}▶{% endif %}</button>
           </form>
+          {% if cloud.eingeschaltet and not cloud.auto %}
+          <form method="post" action="{{ base }}schedule/cloud/{{ job.id }}">
+            <button class="ghost klein"
+                    title="{% if job.cloud_auto %}Keine Cloud-Kopie mehr{% else %}Aufnahmen in die Cloud kopieren{% endif %}"
+                    {% if job.cloud_auto %}style="border-color:var(--accent)"{% endif %}>☁</button>
+          </form>
+          {% endif %}
           <form method="post" action="{{ base }}schedule/delete/{{ job.id }}"
                 onsubmit="return confirm('Zeitplan „{{ job.name }}“ löschen?')">
             <button class="danger klein">🗑</button>
@@ -194,6 +211,25 @@
             {{ speicher.frei_arbeit }} frei{% if speicher.gemeinsam %} ·
             gleicher Datenträger wie der Zielordner{% endif %}
           </span></td>
+    </tr>
+    <tr>
+      <th>Cloud</th>
+      <td>
+        {% if not cloud.eingeschaltet %}
+          <span class="small">aus — einschalten über die Add-on-Option
+            <span class="mono">cloud_type</span></span>
+        {% elif cloud.bereit %}
+          <span class="mono">{{ cloud.ziel }}</span><br>
+          <span class="small">
+            {% if cloud.auto %}jede Aufnahme wird kopiert{% else %}Kopie auf
+            Knopfdruck oder je Zeitplan{% endif %}
+            {%- if cloud.wartend %} · {{ cloud.wartend }} warten auf Upload{% endif %}
+          </span>
+        {% else %}
+          <span class="err">⚠ eingeschaltet, aber es fehlt:
+            {{ cloud.fehlt | join(', ') }}</span>
+        {% endif %}
+      </td>
     </tr>
   </table>
   <p class="{% if speicher.knapp %}err{% else %}small{% endif %}">

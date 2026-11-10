@@ -14,6 +14,25 @@ if bashio::config.has_value 'work_dir'; then
     mkdir -p "${WORK_DIR}" || bashio::log.warning "Arbeitsordner ${WORK_DIR} nicht anlegbar"
 fi
 
+# --- Cloud ------------------------------------------------------------------
+# Nur eine zusaetzliche Kopie fertiger Aufnahmen; der Zielordner bleibt davon
+# unberuehrt. Optionale Angaben werden nur gesetzt, wenn sie vorhanden sind -
+# sonst liefert bashio das Wort "null".
+optional() {
+    if bashio::config.has_value "$1"; then
+        export "$2=$(bashio::config "$1")"
+    fi
+}
+export CLOUD_TYPE="$(bashio::config 'cloud_type')"
+export CLOUD_AUTO="$(bashio::config 'cloud_auto')"
+optional cloud_url           CLOUD_URL
+optional cloud_user          CLOUD_USER
+optional cloud_password      CLOUD_PASSWORD
+optional cloud_path          CLOUD_PATH
+optional cloud_remote        CLOUD_REMOTE
+optional cloud_config        CLOUD_CONFIG
+optional cloud_bwlimit_kbyte CLOUD_BWLIMIT_KBYTE
+
 # --- Zeitzone ---------------------------------------------------------------
 # Der Supervisor reicht TZ normalerweise selbst in den Container. Wir setzen
 # den Wert hier trotzdem ausdruecklich und legen zusaetzlich /etc/localtime an,

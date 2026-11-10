@@ -13,7 +13,7 @@ Home-Assistant-Add-on, das Internetradio zeitgesteuert mit FFmpeg
 aufzeichnet. Oberfläche über Ingress, Flask, SQLite.
 
 * Repository: https://github.com/jenser1/ha-radio-recorder-addon
-* Aktuelle Fassung: **0.8.0**, Schema-Stand der Datenbank: **6**
+* Aktuelle Fassung: **0.9.0**, Schema-Stand der Datenbank: **7**
 
 ## Aufbau
 
@@ -35,28 +35,32 @@ radio_recorder/              das Add-on
     titelfilter.py  Lied, Senderkennung, Sendung, Werbung unterscheiden
     directory.py radio-browser.info
     library.py   Zielordner nach Aufnahmen durchsuchen
+    cloud.py     Kopie in die Cloud per rclone, Warteschlange im Hintergrund;
+                 der Recorder laedt es erst in _finalize (sonst Kreisimport)
     web.py       Flask, alle Routen
-tests/                       Rauchtests, brauchen kein ffmpeg
+tests/                       Rauchtests, brauchen kein ffmpeg und kein rclone
 legacy/                      alte Fassung, nicht mehr aktiv
 ```
 
 ## Entwickeln und Testen
 
 ```bash
-python tests/test_phase0.py && python tests/test_phase1.py && python tests/test_phase3.py
+python tests/test_phase0.py && python tests/test_phase1.py && python tests/test_phase2.py && python tests/test_phase3.py
 ```
 
-289 Prüfungen (83 + 105 + 101). **Immer alle drei laufen lassen**, auch bei
-kleinen Änderungen — der Recorder hängt an allem.
+382 Prüfungen (83 + 105 + 93 + 101). **Immer alle vier laufen lassen**,
+auch bei kleinen Änderungen — der Recorder hängt an allem.
 
-ffmpeg und ffprobe werden durch `tests/fake_ffmpeg.py` und
-`tests/fake_ffprobe.py` ersetzt, gesteuert über Umgebungsvariablen
-(`RR_FAKE_TITEL`, `RR_FAKE_VORLAUF`, `RR_FAKE_PROBE`, `RR_FAKE_FAIL`,
-`RR_FAKE_HAENGT`).
-Dadurch laufen die Tests ohne ffmpeg und ohne Internet, auch in der CI.
+ffmpeg, ffprobe und rclone werden durch `tests/fake_ffmpeg.py`,
+`tests/fake_ffprobe.py` und `tests/fake_rclone.py` ersetzt, gesteuert über
+Umgebungsvariablen (`RR_FAKE_TITEL`, `RR_FAKE_VORLAUF`, `RR_FAKE_PROBE`,
+`RR_FAKE_FAIL`, `RR_FAKE_HAENGT`, `RR_FAKE_RCLONE`). Die „Cloud" ist dabei
+ein Ordner. Dadurch laufen die Tests ohne diese Programme und ohne
+Internet, auch in der CI.
 
-Echtes ffmpeg-Verhalten lässt sich damit nicht prüfen. Alles, was daran
-hängt — Titelmeldungen, Codecs, Zusammenfügen —, muss auf einem laufenden
+Echtes ffmpeg- und rclone-Verhalten lässt sich damit nicht prüfen. Alles,
+was daran hängt — Titelmeldungen, Codecs, Zusammenfügen, die Anmeldung bei
+einem echten Cloud-Anbieter —, muss auf einem laufenden
 Home-Assistant-System nachgesehen werden. Das Add-on schreibt zu solchen
 Dingen ausdrücklich ins Protokoll, weil die Oberfläche es nur kurzlebig
 anzeigt.
@@ -139,7 +143,7 @@ Veröffentlichung. Tags werden zusätzlich gesetzt, rein für Menschen.
 |---|---|---|
 | 0 | Fundament: Zeitzone, SQLite, neustartsichere Aufnahmen, Platzprüfung | fertig, im Betrieb bestätigt |
 | 1 | Sender, Codec-Erkennung, Endzeit, Vor-/Nachlauf, Bibliothek | fertig, im Betrieb bestätigt |
-| 2 | Speicherziele | NAS läuft über HA-Netzwerkspeicher; Aufräumregeln und Cloud-Upload offen |
+| 2 | Speicherziele | NAS läuft über HA-Netzwerkspeicher; Cloud-Kopie fertig (0.9.0), im Betrieb noch unbestätigt; Aufräumregeln offen |
 | 3 | Aufnahmen in Einzeltitel zerlegen | Stufen 1–2 im Betrieb bestätigt, Stufe 3 fertig (0.8.0), Stufe 4 offen, siehe unten |
 | 4 | MQTT-Anbindung an Home Assistant | offen |
 | 5 | Podcasts, Statistik, Programmführer | offen |
@@ -183,6 +187,26 @@ Buuren" sind nur über Muster erkennbar. Die Kennungsregel verlangt, dass
 Entschieden ist bereits: zerlegt wird erst auf Knopfdruck, die
 Originalaufnahme bleibt erhalten, Ablage in einem Ordner je Aufnahme,
 Titelbilder über das Cover Art Archive.
+
+## Cloud-Kopie
+
+Phase 2, seit 0.9.0. Der Zielordner bleibt das eigentliche Ziel, die Cloud
+bekommt nur eine **Kopie** — gelöscht wird nach dem Upload nichts. Das
+gehört zu den Aufräumregeln, die noch offen sind.
+
+* Zustand steht in `recordings.cloud_state` (queued, uploading, done,
+  failed). Die Datenbank ist maßgeblich; das Wecksignal des Threads ist nur
+  ein Hinweis, alle fünf Minuten wird ohnehin nachgesehen.
+* rclone läuft mit `--retries 1`, wiederholt wird in `cloud.py` (dreimal,
+  eine Minute Pause). Wird das Add-on in der Pause beendet, geht der
+  Eintrag zurück auf queued, nicht auf failed.
+* WebDAV und S3: die rclone.conf entsteht aus den Optionen unter
+  `/data/rclone-cloud.conf`. Das WebDAV-Passwort geht über
+  `rclone obscure -` per Standardeingabe hinein, nie als Argument.
+* Anbieter mit Browser-Anmeldung (Drive, Dropbox, OneDrive) nur über eine
+  eigene rclone.conf in `/share`, Option `cloud_type: rclone`.
+* Automatisch nur bei Zustand `completed`; von Hand gestoppte Aufnahmen
+  nur über den Knopf.
 
 ## Konventionen
 

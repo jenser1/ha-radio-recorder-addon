@@ -6,8 +6,8 @@ from pathlib import Path
 from flask import (Flask, abort, flash, jsonify, redirect, render_template,
                    request, send_file)
 
-from . import (__version__, config, db, directory, library, metadata, probe,
-               scheduler, titelfilter, zeit)
+from . import (__version__, cloud, config, db, directory, library, metadata,
+               probe, scheduler, titelfilter, zeit)
 from . import recorder as recorder_mod
 from .recorder import recorder
 
@@ -79,6 +79,7 @@ def create_app():
             jobs=jobs,
             active=recorder.active(),
             speicher=storage_info(),
+            cloud=cloud.uebersicht(),
         )
 
     @app.route("/start", methods=["POST"])
@@ -136,6 +137,7 @@ def create_app():
                 duration_minutes=duration, weekdays=weekdays,
                 end_time=end_time, lead_in_minutes=lead_in,
                 lead_out_minutes=lead_out,
+                cloud_auto=request.form.get("cloud_auto") == "1",
             )
             scheduler.schedule(db.get_job(job_id))
             flash(f"Zeitplan {name!r} gespeichert.", "ok")
@@ -163,6 +165,22 @@ def create_app():
                     flash(str(err), "error")
             else:
                 scheduler.unschedule(job_id)
+        return redirect(_ingress_base())
+
+    @app.route("/schedule/cloud/<job_id>", methods=["POST"])
+    def toggle_schedule_cloud(job_id):
+        """Schaltet die automatische Cloud-Kopie fuer einen Zeitplan um."""
+        job = db.get_job(job_id)
+        if job is None:
+            flash("Diesen Zeitplan gibt es nicht mehr.", "error")
+            return redirect(_ingress_base())
+        an = not job["cloud_auto"]
+        db.set_job_cloud_auto(job_id, an)
+        if an:
+            flash(f"{job['name']!r}: Aufnahmen werden nach dem Ende in die "
+                  f"Cloud kopiert.", "ok")
+        else:
+            flash(f"{job['name']!r}: keine automatische Cloud-Kopie mehr.", "ok")
         return redirect(_ingress_base())
 
     # --- Sender ----------------------------------------------------------
@@ -333,12 +351,25 @@ def create_app():
             item["dateiname"] = pfad.name if pfad else ""
             item["state_label"] = STATE_LABELS.get(item["state"], item["state"])
             item["duration_text"] = _span(item["started_at"], item["ended_at"])
+            item["cloud_text"] = cloud.ZUSTAND_TEXT.get(item.get("cloud_state"), "")
             if pfad:
                 gesamt += item["size_bytes"] or 0
 
         return render_template("recordings.html", seite="bibliothek",
                                recordings=eintraege, gesamt=gesamt,
-                               urteile=titelfilter.URTEIL_TEXT)
+                               urteile=titelfilter.URTEIL_TEXT,
+                               cloud=cloud.uebersicht())
+
+    @app.route("/recordings/cloud/<rid>", methods=["POST"])
+    def cloud_recording(rid):
+        """Stellt eine Aufnahme zum Hochladen an - auch fuer einen neuen Versuch."""
+        try:
+            cloud.einreihen(rid)
+            flash("Aufnahme wird in die Cloud kopiert. Der Stand steht hier in "
+                  "der Liste, sobald die Seite neu geladen wird.", "ok")
+        except ValueError as err:
+            flash(str(err), "error")
+        return redirect(_ingress_base() + "recordings")
 
     @app.route("/recordings/scan", methods=["POST"])
     def scan_recordings():
@@ -384,6 +415,10 @@ def create_app():
             return redirect(_ingress_base() + "recordings")
         if eintrag["state"] == "running":
             flash("Diese Aufnahme laeuft noch. Bitte zuerst stoppen.", "error")
+            return redirect(_ingress_base() + "recordings")
+        if eintrag.get("cloud_state") == "uploading":
+            flash("Diese Aufnahme wird gerade in die Cloud kopiert. Bitte das "
+                  "Ende abwarten.", "error")
             return redirect(_ingress_base() + "recordings")
 
         pfad = _recording_path(eintrag, still=True)

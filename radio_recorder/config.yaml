@@ -1,5 +1,5 @@
 name: "Radio Recorder"
-version: "0.8.0"
+version: "0.9.0"
 slug: "radio_recorder"
 description: "Internetradio zeitgesteuert mit FFmpeg aufzeichnen"
 url: "https://github.com/jenser1/ha-radio-recorder-addon"
@@ -15,12 +15,17 @@ panel_title: "Radio Recorder"
 map:
   - type: media
     read_only: false
+  # Nur gelesen: dort darf eine eigene rclone.conf liegen (cloud_type rclone).
+  - type: share
+    read_only: true
 options:
   output_dir: "/media/radio"
   default_duration_hours: 4
   default_duration_minutes: 0
   segment_minutes: 10
   min_free_mb: 500
+  cloud_type: "aus"
+  cloud_auto: false
 schema:
   output_dir: str
   default_duration_hours: int(0,24)
@@ -28,3 +33,12 @@ schema:
   segment_minutes: int(1,60)
   min_free_mb: int(0,1048576)
   work_dir: str?
+  cloud_type: list(aus|webdav|s3|rclone)
+  cloud_url: str?
+  cloud_user: str?
+  cloud_password: password?
+  cloud_path: str?
+  cloud_remote: str?
+  cloud_config: str?
+  cloud_bwlimit_kbyte: int(0,1000000)?
+  cloud_auto: bool
