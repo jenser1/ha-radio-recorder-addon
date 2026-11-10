@@ -46,7 +46,7 @@ legacy/                      alte Fassung, nicht mehr aktiv
 python tests/test_phase0.py && python tests/test_phase1.py && python tests/test_phase3.py
 ```
 
-288 Prüfungen (82 + 105 + 101). **Immer alle drei laufen lassen**, auch bei
+289 Prüfungen (83 + 105 + 101). **Immer alle drei laufen lassen**, auch bei
 kleinen Änderungen — der Recorder hängt an allem.
 
 ffmpeg und ffprobe werden durch `tests/fake_ffmpeg.py` und

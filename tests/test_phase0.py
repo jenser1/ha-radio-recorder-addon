@@ -79,6 +79,15 @@ mit_crlf = [
 pruefe(not mit_crlf, "Keine Datei hat Windows-Zeilenenden",
        f"-> {mit_crlf}")
 
+# Der Kurzclip steckt im Repo und wird in der README verlinkt. Faellt die
+# Datei weg oder wird sie umbenannt, zeigt die README ins Leere, ohne dass es
+# jemandem auffaellt.
+readme = (REPO / "README.md").read_text(encoding="utf-8")
+clip = REPO / "docs" / "kurzclip.mp4"
+pruefe(clip.is_file() and "docs/kurzclip.mp4" in readme,
+       "Kurzclip liegt im Repo und ist in der README verlinkt",
+       f"-> Datei: {clip.is_file()}, Verweis: {'docs/kurzclip.mp4' in readme}")
+
 shebang = (PROJECT / "run.sh").read_bytes().split(b"\n")[0]
 pruefe(shebang == b"#!/usr/bin/with-contenv bashio",
        "Shebang von run.sh ist unversehrt", f"-> {shebang!r}")

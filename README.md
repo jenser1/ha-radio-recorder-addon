@@ -13,6 +13,17 @@ Zeitplan, bis zu 24 Stunden am Stück.
 ![Lizenz](https://img.shields.io/badge/Lizenz-MIT-green)
 [![Erstellt mit Claude Code](https://img.shields.io/badge/Erstellt%20mit-Claude%20Code-d97757)](https://claude.com/claude-code)
 
+## Kurzclip
+
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/4794457b-34a5-4c49-9a1c-2e7c42039575" width="640" controls>
+    <a href="https://github.com/user-attachments/assets/4794457b-34a5-4c49-9a1c-2e7c42039575">Kurzclip ansehen (MP4, 5,4 MB)</a>
+  </video>
+</p>
+
+Spielt der Player nicht, liegt der Clip auch im Repository:
+[docs/kurzclip.mp4](docs/kurzclip.mp4) (5,4 MB).
+
 ## Installation
 
 1. In Home Assistant: **Einstellungen → Add-ons → Add-on-Store**
@@ -88,6 +99,7 @@ angewiesen ist:
 │   ├── icon.png             Symbol in der Add-on-Liste (256×256)
 │   ├── logo.png             Logo auf der Add-on-Seite
 │   └── radio_recorder/      Python-Paket
+├── docs/                    Kurzclip für die README
 ├── tests/                   Rauchtests
 └── legacy/                  Dateien einer früheren Fassung, nicht mehr aktiv
 ```
