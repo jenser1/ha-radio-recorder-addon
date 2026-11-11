@@ -584,7 +584,57 @@ if formular:
            "Schalter am gespeicherten Zeitplan laesst sich umlegen")
 
 
-print("\n=== 12. Add-on-Dateien ===")
+print("\n=== 12. Eigene rclone-Konfiguration ===")
+# /share ist nur lesend eingebunden. rclone muss erneuerte Zugangsschluessel
+# aber zurueckschreiben koennen, sonst verfaellt die Anmeldung bei OneDrive
+# und Co. - deshalb arbeitet das Add-on mit einer Kopie in /data.
+cloud_aus()
+vorlage = WORK / "share" / "rclone.conf"
+vorlage.parent.mkdir(parents=True, exist_ok=True)
+with open(vorlage, "w", encoding="utf-8", newline="") as datei:
+    datei.write("[onedrive]\ntype = onedrive\ntoken = alt\n")
+config.CLOUD_TYPE = "rclone"
+config.CLOUD_REMOTE = "onedrive"
+config.CLOUD_PATH = "Radiotest"
+config.CLOUD_CONFIG = vorlage
+kopie_conf = config.DATA_DIR / "rclone-eigen.conf"
+pruefe(cloud.bereit(), "Mit Remote und vorhandener rclone.conf bereit")
+
+log_leeren()
+os.environ["RR_FAKE_RCLONE_ERNEUERN"] = "1"
+datei8 = lege_aufnahme_an("eig1")
+cloud.einreihen("eig1")
+cloud.verarbeite_einen()
+del os.environ["RR_FAKE_RCLONE_ERNEUERN"]
+kopien = kopieraufrufe()
+pruefe(db.get_recording("eig1")["cloud_state"] == "done"
+       and in_der_cloud(datei8, remote="onedrive", pfad="Radiotest").is_file(),
+       "Upload ueber das eigene Remote klappt",
+       f"-> {db.get_recording('eig1')['cloud_state']} / {db.get_recording('eig1')['cloud_error']}")
+pruefe(kopien and kopien[0][2] == "onedrive:Radiotest"
+       and kopien[0][kopien[0].index("--config") + 1] == str(kopie_conf),
+       "rclone arbeitet mit der Kopie in /data, nicht mit der Vorlage",
+       f"-> {kopien}")
+pruefe(vorlage.read_text(encoding="utf-8") == "[onedrive]\ntype = onedrive\ntoken = alt\n",
+       "Die Vorlage bleibt unberuehrt")
+pruefe("token = neu" in kopie_conf.read_text(encoding="utf-8"),
+       "Erneuerter Schluessel landet in der Kopie")
+
+cloud.einreihen("eig1")
+cloud.verarbeite_einen()
+pruefe("token = neu" in kopie_conf.read_text(encoding="utf-8"),
+       "Naechster Upload ueberschreibt den erneuerten Schluessel nicht")
+
+with open(vorlage, "w", encoding="utf-8", newline="") as datei:
+    datei.write("[onedrive]\ntype = onedrive\ntoken = frisch\n")
+cloud.einreihen("eig1")
+cloud.verarbeite_einen()
+pruefe("token = frisch" in kopie_conf.read_text(encoding="utf-8"),
+       "Neu eingerichtete Vorlage wird uebernommen")
+cloud_aus()
+
+
+print("\n=== 13. Add-on-Dateien ===")
 # Der Container laesst sich hier nicht bauen. Was dort zusammenpassen muss,
 # wird wenigstens in den Dateien geprueft.
 yaml_text = (PROJECT / "config.yaml").read_text(encoding="utf-8")

@@ -19,7 +19,9 @@ Update anbietet - eigene GitHub-Releases braucht es dafür nicht.
   Den Stand zeigt die Bibliothek an jeder Aufnahme.
 
 - Das Add-on bindet jetzt zusätzlich `/share` ein, nur lesend - dort darf
-  eine eigene `rclone.conf` liegen.
+  eine eigene `rclone.conf` liegen. Gearbeitet wird mit einer Kopie in
+  `/data`, damit rclone erneuerte Zugangsschlüssel speichern kann; sonst
+  verfiele die Anmeldung bei OneDrive und Co. nach einiger Zeit.
 
 - Datenbank auf Stand 7 (neue Spalten für Zeitpläne und Aufnahmen).
   Zeitpläne, Aufnahmen und Titel bleiben beim Update erhalten; kein

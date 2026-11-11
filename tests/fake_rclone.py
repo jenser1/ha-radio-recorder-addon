@@ -13,12 +13,17 @@ RR_FAKE_RCLONE steuert das Kopieren:
   einmal_fehler  erster Aufruf scheitert, jeder weitere klappt; der Zaehler
                  steht in RR_FAKE_RCLONE_ZAEHLER
 
+Ist RR_FAKE_RCLONE_ERNEUERN gesetzt, schreibt ein erfolgreicher Upload wie
+das echte rclone einen erneuerten Zugangsschluessel in die Datei hinter
+--config zurueck ("token = neu").
+
 Jeder Aufruf wird als JSON-Zeile nach RR_FAKE_RCLONE_LOG geschrieben, damit
 der Test die Argumente pruefen kann.
 """
 
 import json
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -67,6 +72,14 @@ def main():
         ordner = Path(os.environ["RR_FAKE_RCLONE_CLOUD"]) / remote / pfad
         ordner.mkdir(parents=True, exist_ok=True)
         shutil.copy2(quelle, ordner / quelle.name)
+
+        if os.environ.get("RR_FAKE_RCLONE_ERNEUERN") and "--config" in args:
+            # Scheitert hier das Schreiben, ist die Datei nicht beschreibbar -
+            # genau das, was beim nur lesbar eingebundenen /share passiert.
+            konfig = Path(args[args.index("--config") + 1])
+            text = konfig.read_text(encoding="utf-8")
+            with open(konfig, "w", encoding="utf-8", newline="") as datei:
+                datei.write(re.sub(r"token = .*", "token = neu", text))
         return 0
 
     sys.stderr.write(f"Unbekannter Aufruf: {args}\n")

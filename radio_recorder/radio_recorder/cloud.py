@@ -18,7 +18,9 @@ innerhalb des Add-ons nicht durchfuehren.
 """
 
 import configparser
+import hashlib
 import os
+import shutil
 import subprocess
 import threading
 from pathlib import Path
@@ -311,7 +313,7 @@ def _fehlschlag(rid, meldung):
 
 def _rclone_kopie(datei):
     if config.CLOUD_TYPE == "rclone":
-        konfig = Path(config.CLOUD_CONFIG)
+        konfig = _eigene_konfiguration()
         ziel = f"{config.CLOUD_REMOTE}:{config.CLOUD_PATH}"
     else:
         konfig = _schreibe_konfiguration()
@@ -383,6 +385,47 @@ def _schreibe_konfiguration():
     except OSError:
         pass
     return pfad
+
+
+def _eigene_konfiguration():
+    """Beschreibbare Kopie der eigenen rclone.conf in /data.
+
+    /share ist nur lesend eingebunden. Bei OneDrive, Google Drive und
+    Dropbox laeuft der Zugangsschluessel nach einer Stunde ab; rclone
+    erneuert ihn und schreibt den neuen in die Konfiguration zurueck. Kann
+    es das nicht, verfaellt die Anmeldung irgendwann ganz, und jeder Upload
+    scheitert, bis jemand sie neu einrichtet.
+
+    Neu kopiert wird nur, wenn sich die Vorlage geaendert hat - etwa weil
+    das Remote neu eingerichtet wurde. Bei jedem Upload zu kopieren wuerde
+    die erneuerten Schluessel jedes Mal wieder ueberschreiben.
+    """
+    quelle = Path(config.CLOUD_CONFIG)
+    kopie = config.DATA_DIR / "rclone-eigen.conf"
+    marke = config.DATA_DIR / "rclone-eigen.quelle"
+    try:
+        stand = hashlib.sha256(quelle.read_bytes()).hexdigest()
+    except OSError as err:
+        raise CloudFehler(f"{quelle} ist nicht lesbar: {err}") from None
+    try:
+        bisher = marke.read_text(encoding="utf-8").strip()
+    except OSError:
+        bisher = ""
+    if kopie.is_file() and bisher == stand:
+        return kopie
+
+    kopie.parent.mkdir(parents=True, exist_ok=True)
+    zwischen = kopie.with_name(kopie.name + ".neu")
+    shutil.copyfile(quelle, zwischen)
+    try:
+        os.chmod(zwischen, 0o600)
+    except OSError:
+        pass
+    os.replace(zwischen, kopie)
+    with open(marke, "w", encoding="utf-8", newline="") as datei:
+        datei.write(stand)
+    print(f"[cloud] rclone.conf aus {quelle} uebernommen", flush=True)
+    return kopie
 
 
 def _verschleiere(passwort):

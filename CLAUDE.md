@@ -48,7 +48,7 @@ legacy/                      alte Fassung, nicht mehr aktiv
 python tests/test_phase0.py && python tests/test_phase1.py && python tests/test_phase2.py && python tests/test_phase3.py
 ```
 
-382 Prüfungen (83 + 105 + 93 + 101). **Immer alle vier laufen lassen**,
+389 Prüfungen (83 + 105 + 100 + 101). **Immer alle vier laufen lassen**,
 auch bei kleinen Änderungen — der Recorder hängt an allem.
 
 ffmpeg, ffprobe und rclone werden durch `tests/fake_ffmpeg.py`,
@@ -143,7 +143,7 @@ Veröffentlichung. Tags werden zusätzlich gesetzt, rein für Menschen.
 |---|---|---|
 | 0 | Fundament: Zeitzone, SQLite, neustartsichere Aufnahmen, Platzprüfung | fertig, im Betrieb bestätigt |
 | 1 | Sender, Codec-Erkennung, Endzeit, Vor-/Nachlauf, Bibliothek | fertig, im Betrieb bestätigt |
-| 2 | Speicherziele | NAS läuft über HA-Netzwerkspeicher; Cloud-Kopie fertig (0.9.0), im Betrieb noch unbestätigt; Aufräumregeln offen |
+| 2 | Speicherziele | NAS läuft über HA-Netzwerkspeicher; Cloud-Kopie fertig (0.9.0), Upload zu OneDrive im Betrieb bestätigt; Aufräumregeln offen |
 | 3 | Aufnahmen in Einzeltitel zerlegen | Stufen 1–2 im Betrieb bestätigt, Stufe 3 fertig (0.8.0), Stufe 4 offen, siehe unten |
 | 4 | MQTT-Anbindung an Home Assistant | offen |
 | 5 | Podcasts, Statistik, Programmführer | offen |
@@ -204,7 +204,14 @@ gehört zu den Aufräumregeln, die noch offen sind.
   `/data/rclone-cloud.conf`. Das WebDAV-Passwort geht über
   `rclone obscure -` per Standardeingabe hinein, nie als Argument.
 * Anbieter mit Browser-Anmeldung (Drive, Dropbox, OneDrive) nur über eine
-  eigene rclone.conf in `/share`, Option `cloud_type: rclone`.
+  eigene rclone.conf in `/share`, Option `cloud_type: rclone`. rclone
+  bekommt **nie** die Vorlage, sondern eine Kopie in
+  `/data/rclone-eigen.conf`: `/share` ist nur lesend, und rclone muss den
+  stündlich erneuerten Zugangsschlüssel zurückschreiben können, sonst
+  verfällt die Anmeldung. Neu kopiert wird nur bei geänderter Vorlage
+  (SHA-256 in `rclone-eigen.quelle`), sonst gingen die erneuerten
+  Schlüssel bei jedem Upload verloren. Mit OneDrive im Betrieb bestätigt
+  (11.11.2026, 435 MB).
 * Automatisch nur bei Zustand `completed`; von Hand gestoppte Aufnahmen
   nur über den Knopf.
 

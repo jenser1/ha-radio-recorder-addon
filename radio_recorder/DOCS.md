@@ -192,6 +192,13 @@ cloud_remote: gdrive
 cloud_path: Radioaufnahmen
 ```
 
+Das Add-on arbeitet mit einer eigenen Kopie dieser Datei unter
+`/data/rclone-eigen.conf`. Bei Google Drive, Dropbox und OneDrive läuft der
+Zugangsschlüssel nach einer Stunde ab; rclone erneuert ihn und muss den
+neuen speichern können, und `/share` ist nur lesend eingebunden. Wird das
+Remote später neu eingerichtet und die Datei in `/share` ersetzt, übernimmt
+das Add-on sie beim nächsten Upload von selbst.
+
 Unter **Aufnahme → Speicher** steht danach das Ziel. Fehlt eine Angabe,
 steht dort, welche.
 
